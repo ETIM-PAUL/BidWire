@@ -5,6 +5,7 @@ import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { ActivityFeed } from '../components/ActivityFeed'
 import { MaterialsTab } from '../components/MaterialsTab'
+import { SuppliersTab } from '../components/SuppliersTab'
 
 const TABS = ['Materials', 'Suppliers', 'Inbox', 'Compare'] as const
 
@@ -51,9 +52,9 @@ export function ProjectPage() {
             ))}
           </nav>
           <main className="px-6 py-8">
-            {tab === 'Materials' ? (
-              <MaterialsTab project={project} />
-            ) : (
+            {tab === 'Materials' && <MaterialsTab project={project} />}
+            {tab === 'Suppliers' && <SuppliersTab project={project} />}
+            {tab !== 'Materials' && tab !== 'Suppliers' && (
               <p className="text-sm text-neutral-400">{tab} — coming soon.</p>
             )}
           </main>

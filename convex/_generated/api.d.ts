@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as boq from "../boq.js";
+import type * as discovery from "../discovery.js";
 import type * as events from "../events.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
@@ -17,6 +18,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_llm from "../lib/llm.js";
 import type * as lineItems from "../lineItems.js";
 import type * as projects from "../projects.js";
+import type * as suppliers from "../suppliers.js";
 
 import type {
   ApiFromModules,
@@ -27,6 +29,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   boq: typeof boq;
+  discovery: typeof discovery;
   events: typeof events;
   files: typeof files;
   http: typeof http;
@@ -34,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "lib/llm": typeof lib_llm;
   lineItems: typeof lineItems;
   projects: typeof projects;
+  suppliers: typeof suppliers;
 }>;
 
 /**
@@ -62,4 +66,8 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  firecrawl: import("@firecrawl/firecrawl-convex/_generated/component.js").ComponentApi<"firecrawl">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  actionRetrier: import("@convex-dev/action-retrier/_generated/component.js").ComponentApi<"actionRetrier">;
+};
