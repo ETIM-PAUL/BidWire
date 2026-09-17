@@ -48,6 +48,25 @@ replies, and builds a price comparison that updates live as quotes arrive.
   reload → open workspace → tabs/activity render) passed with zero console
   errors. Reviewed against the Convex reviewer checklist; fixed one finding
   (`listMyProjects` used an unbounded `.collect()` — capped with `.take(500)`).
+- **Phase 3 — Job intake → bill of quantities.** `convex/boq.ts`'s `generateBoq`
+  action turns a project's job description into 15–30 structured line items via
+  `structuredCall` (strict JSON schema, no free-text parsing), writing them in
+  batches of 4 (`convex/lineItems.ts`'s `insertBatch` internal mutation) so rows
+  visibly stream in rather than appearing all at once. `convex/lineItems.ts`
+  adds the full editable-table surface (`createLineItem`, `updateLineItem`,
+  `deleteLineItem`, `moveLineItem`), all ownership-checked via a new
+  `requireLineItemOwner` helper. Optional photo/drawing upload at intake via
+  `convex/files.ts` (`generateUploadUrl` + Convex file storage), attached to
+  the project at creation.
+  Reviewed against the Convex reviewer checklist and fixed a real finding: the
+  first version of `files.ts`'s attachment-URL query took a client-supplied
+  list of storage IDs and resolved any of them for any signed-in user — an
+  IDOR letting one user resolve another project's files if they ever obtained
+  a storage ID. Fixed by deriving the storage IDs server-side from the
+  caller's own (ownership-checked) project record instead of trusting client
+  input; added `convex/lineItems.test.ts` as a regression test proving a
+  second user is refused both the line items and the attachments of a project
+  they don't own.
 
 ## Security note
 

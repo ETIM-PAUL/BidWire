@@ -3,13 +3,16 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
 import { SignOutButton } from '../components/SignOutButton'
 
 export function HomePage() {
   const projects = useQuery(api.projects.listMyProjects)
   const createProject = useMutation(api.projects.createProject)
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -17,13 +20,26 @@ export function HomePage() {
     const formData = new FormData(form)
     setSubmitting(true)
     try {
+      const attachmentIds: Id<'_storage'>[] = []
+      for (const file of files) {
+        const uploadUrl = await generateUploadUrl()
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        })
+        const { storageId } = (await res.json()) as { storageId: Id<'_storage'> }
+        attachmentIds.push(storageId)
+      }
       await createProject({
         name: String(formData.get('name')),
         jobDescription: String(formData.get('jobDescription') ?? ''),
         location: String(formData.get('location') ?? ''),
         currency: String(formData.get('currency') ?? 'USD'),
+        attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
       })
       form.reset()
+      setFiles([])
       setShowForm(false)
     } finally {
       setSubmitting(false)
@@ -79,6 +95,23 @@ export function HomePage() {
                 defaultValue="USD"
                 className="rounded-md bg-neutral-900 border border-neutral-800 px-3 py-2 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500 mb-1">
+                Photos or drawings (optional)
+              </label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={(e) => setFiles(Array.from(e.currentTarget.files ?? []))}
+                className="w-full text-sm text-neutral-400 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-sm file:text-neutral-200"
+              />
+              {files.length > 0 && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  {files.length} file{files.length > 1 ? 's' : ''} selected
+                </p>
+              )}
             </div>
             <button
               type="submit"

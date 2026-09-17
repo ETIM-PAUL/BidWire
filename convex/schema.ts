@@ -21,6 +21,7 @@ export default defineSchema({
     ),
     inboxId: v.optional(v.string()),
     inboxAddress: v.optional(v.string()),
+    attachmentIds: v.optional(v.array(v.id("_storage"))),
     createdAt: v.number(),
   }).index("by_owner", ["ownerId"]),
 

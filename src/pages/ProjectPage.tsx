@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { ActivityFeed } from '../components/ActivityFeed'
+import { MaterialsTab } from '../components/MaterialsTab'
 
 const TABS = ['Materials', 'Suppliers', 'Inbox', 'Compare'] as const
 
@@ -49,7 +50,13 @@ export function ProjectPage() {
               </button>
             ))}
           </nav>
-          <main className="px-6 py-8 text-sm text-neutral-400">{tab} — coming soon.</main>
+          <main className="px-6 py-8">
+            {tab === 'Materials' ? (
+              <MaterialsTab project={project} />
+            ) : (
+              <p className="text-sm text-neutral-400">{tab} — coming soon.</p>
+            )}
+          </main>
         </div>
         <aside className="border-l border-neutral-800 px-4 py-6">
           <ActivityFeed projectId={projectId} />

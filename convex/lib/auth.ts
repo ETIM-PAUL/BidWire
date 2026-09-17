@@ -23,3 +23,15 @@ export async function requireProjectOwner(
   }
   return project;
 }
+
+export async function requireLineItemOwner(
+  ctx: QueryCtx | MutationCtx,
+  lineItemId: Id<"lineItems">,
+) {
+  const lineItem = await ctx.db.get(lineItemId);
+  if (!lineItem) {
+    throw new Error("Line item not found");
+  }
+  await requireProjectOwner(ctx, lineItem.projectId);
+  return lineItem;
+}

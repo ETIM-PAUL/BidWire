@@ -9,10 +9,13 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as boq from "../boq.js";
 import type * as events from "../events.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_llm from "../lib/llm.js";
+import type * as lineItems from "../lineItems.js";
 import type * as projects from "../projects.js";
 
 import type {
@@ -23,10 +26,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  boq: typeof boq;
   events: typeof events;
+  files: typeof files;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/llm": typeof lib_llm;
+  lineItems: typeof lineItems;
   projects: typeof projects;
 }>;
 

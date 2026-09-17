@@ -22,6 +22,7 @@ const projectFields = {
   status: projectStatus,
   inboxId: v.optional(v.string()),
   inboxAddress: v.optional(v.string()),
+  attachmentIds: v.optional(v.array(v.id("_storage"))),
   createdAt: v.number(),
 };
 
@@ -31,6 +32,7 @@ export const createProject = mutation({
     jobDescription: v.string(),
     location: v.string(),
     currency: v.string(),
+    attachmentIds: v.optional(v.array(v.id("_storage"))),
   },
   returns: v.id("projects"),
   handler: async (ctx, args) => {
@@ -41,6 +43,7 @@ export const createProject = mutation({
       jobDescription: args.jobDescription,
       location: args.location,
       currency: args.currency,
+      attachmentIds: args.attachmentIds,
       status: "draft",
       createdAt: Date.now(),
     });
