@@ -31,6 +31,23 @@ replies, and builds a price comparison that updates live as quotes arrive.
   two findings: missing indexes on foreign-key fields, and `llm.ts`'s `smokeTest`
   demoted from a public `action` to an `internalAction` (a public action calling
   a paid OpenAI endpoint with no auth check is a cost-abuse vector).
+- **Phase 2 — Auth & project shell.** Convex Auth (Password provider); the build
+  plan's target was v2-alpha, but its React/Vite wiring is documented as
+  unfinished (`WIP`), so per the plan's own fallback clause we used the stable
+  v1 (`@convex-dev/auth` 0.0.95) instead. `convex/lib/auth.ts` centralizes
+  ownership checks (`requireUserId`, `requireProjectOwner`) used by every
+  project-scoped function. `convex/projects.ts` (`createProject`,
+  `listMyProjects`, `getProject`) and `convex/events.ts` (`listEvents`) enforce
+  it. Frontend: `/` (project list + create form) and `/p/:id` (workspace with
+  Materials/Suppliers/Inbox/Compare tabs + live activity feed), gated by
+  `Authenticated`/`Unauthenticated`/`AuthLoading`.
+  Verified, not just typechecked: `convex/projects.test.ts` (convex-test) proves
+  a non-owner is refused a project and its events, and an unauthenticated
+  caller is refused everything — the negative cases, not just the happy path.
+  A full browser run (sign up → create project → live list update with no
+  reload → open workspace → tabs/activity render) passed with zero console
+  errors. Reviewed against the Convex reviewer checklist; fixed one finding
+  (`listMyProjects` used an unbounded `.collect()` — capped with `.take(500)`).
 
 ## Security note
 

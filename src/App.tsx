@@ -1,11 +1,27 @@
+import { AuthLoading, Authenticated, Unauthenticated } from 'convex/react'
+import { Route, Routes } from 'react-router-dom'
+import { HomePage } from './pages/HomePage'
+import { ProjectPage } from './pages/ProjectPage'
+import { SignInPage } from './pages/SignInPage'
+
 function App() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Bidwire</h1>
-        <p className="text-neutral-400">Skeleton is up. Build starts here.</p>
-      </div>
-    </div>
+    <>
+      <AuthLoading>
+        <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center">
+          Loading…
+        </div>
+      </AuthLoading>
+      <Unauthenticated>
+        <SignInPage />
+      </Unauthenticated>
+      <Authenticated>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/p/:id" element={<ProjectPage />} />
+        </Routes>
+      </Authenticated>
+    </>
   )
 }
 
