@@ -2,7 +2,7 @@
 
 import OpenAI from "openai";
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 
 const DEFAULT_MODEL = "gpt-5.6-luna";
 
@@ -71,8 +71,11 @@ const smokeTestSchema = {
   additionalProperties: false,
 };
 
-export const smokeTest = action({
+// Internal, not public: this hits a paid OpenAI call and is only meant to be
+// triggered by a developer via `npx convex run lib/llm:smokeTest`, never by a client.
+export const smokeTest = internalAction({
   args: { note: v.optional(v.string()) },
+  returns: v.object({ ok: v.boolean(), message: v.string() }),
   handler: async (_ctx, args) => {
     return structuredCall<{ ok: boolean; message: string }>({
       schemaName: "smoke_test",

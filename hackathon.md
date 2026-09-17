@@ -21,6 +21,16 @@ replies, and builds a price comparison that updates live as quotes arrive.
   Added `convex/lib/llm.ts`: a single `structuredCall()` helper that wraps every
   OpenAI call behind a strict JSON-schema structured output, plus a `smokeTest`
   action to verify the pipeline end to end.
+- **Phase 1 — Data model.** `convex/schema.ts`: full schema (projects, lineItems,
+  suppliers, threads, messages, quotes, quoteLines, drafts, events, plus the
+  Convex Auth `users`/auth tables), every field validated, `by_project` on every
+  child table, plus the FK and lookup indexes later phases need (idempotency on
+  `messages.by_provider_message_id`, thread matching on
+  `threads.by_provider_thread_id`, latest-quote lookups on `quotes.by_supplier`).
+  Schema deploys clean; reviewed against the Convex reviewer checklist and fixed
+  two findings: missing indexes on foreign-key fields, and `llm.ts`'s `smokeTest`
+  demoted from a public `action` to an `internalAction` (a public action calling
+  a paid OpenAI endpoint with no auth check is a cost-abuse vector).
 
 ## Security note
 

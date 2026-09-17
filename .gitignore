@@ -26,5 +26,10 @@ dist-ssr
 # Internal planning doc, not part of the shipped repo
 bidwire-build-plan.md
 
-# Locally-installed Claude Code skills
+# Locally-installed Claude Code / Convex agent skills (regenerate with
+# `npx convex ai-files install`); AGENTS.md / CLAUDE.md pointer files stay tracked.
 .claude/skills/
+skills-lock.json
+convex/_generated/ai/
+
+.agents/
