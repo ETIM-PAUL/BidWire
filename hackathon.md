@@ -67,6 +67,77 @@ replies, and builds a price comparison that updates live as quotes arrive.
   input; added `convex/lineItems.test.ts` as a regression test proving a
   second user is refused both the line items and the attachments of a project
   they don't own.
+- **Phase 4 — Supplier discovery (Firecrawl).** Registered the Firecrawl, Rate
+  Limiter, and Action Retrier components (`convex/convex.config.ts`) — the
+  first phase to actually use any Convex component. `convex/discovery.ts`'s
+  `discoverSuppliers` is a thin public dispatcher: for each distinct
+  materials category on the project, it fires a retried, rate-limited
+  background job (`discoverForCategory`) via the Action Retrier and returns
+  immediately, so the Suppliers tab fills in reactively as each category
+  finishes rather than blocking on the whole run. Each job does one
+  rate-limited Firecrawl `search()` call with `scrapeOptions` (search +
+  scrape in a single Firecrawl-side call), then runs each result's scraped
+  markdown through `structuredCall` to extract `{businessName, email, phone,
+  categories, listPrices}` — the scraped page is untrusted input, passed only
+  as extraction data into a fixed schema, never anything that can trigger a
+  write outside that schema. Pages with no email or phone are discarded.
+  Results are deduped by domain (`convex/suppliers.ts`'s
+  `insertDiscoveredSupplier`) and written with `source: "firecrawl"`. Demo
+  supplier personas (`ensureDemoSuppliers`, `source: "demo"`, emails pulled
+  from `DEMO_ALLOWLIST`) are always added, idempotently.
+  `toggleSupplierSelected` enforces the demo-mode guardrail server-side, not
+  just in the UI: while `DEMO_MODE=true`, only `source: "demo"` suppliers can
+  be set to `status: "selected"` — a real scraped supplier can't be selected
+  for an RFQ no matter what the client sends. Reviewed against the Convex
+  reviewer checklist (clean this round); `convex/suppliers.test.ts` proves
+  the DEMO_MODE lock can't be bypassed by selecting a real supplier directly,
+  proves it still works outside DEMO_MODE, and proves the usual ownership
+  isolation.
+- **Phase 5 — Project inbox & RFQ sending (AgentMail).** Registered the
+  AgentMail component and mounted its webhook at `/agentmail/webhook`
+  (`convex/http.ts`). `convex/inbox.ts`'s `provisionInbox` creates a project's
+  AgentMail inbox idempotently; `convex/rfq.ts`'s `draftRfqs` action
+  provisions the inbox if needed, then drafts one RFQ email per
+  `status: "selected"` supplier via `structuredCall`, containing only the
+  line items matching that supplier's categories, with a computed reply-by
+  date. Drafts land as `pending` rows the contractor edits and approves
+  individually or all at once (`src/components/RfqDrafts.tsx`) before
+  `convex/drafts.ts`'s `sendRfq` actually sends via
+  `agentmail.sendMessage`.
+  `sendRfq` enforces the `DEMO_MODE` allowlist server-side: a send to a
+  recipient not on `DEMO_ALLOWLIST` never reaches AgentMail. Fixed a real bug
+  caught by the regression test itself: the first version tried to both log
+  the blocked attempt to the `events` table *and* throw in the same
+  mutation — but Convex mutations are fully transactional, so the throw
+  silently rolled back the very log entry meant to record it. Fixed by
+  having the blocked path return a structured `{ok: false, blockedReason}`
+  instead of throwing, so the log write actually commits while the caller
+  still sees a clear, loud failure. `convex/drafts.test.ts` proves the block
+  fires, is logged, and leaves the draft/supplier state untouched.
+  Also hit a real type-checker error in `convex/http.ts`: `@agentmail/convex`'s
+  `RunMutationCtx` type is pinned against an older Convex version, so wiring
+  the webhook exactly as their README shows fails `tsc` on the current
+  `convex` version — confirmed it's a types-only version-skew (the actual
+  call shape is unaffected) and bridged it with a narrow, commented cast
+  rather than suppressing the check.
+  Also found and worked around a real upstream bug: `@agentmail/convex`
+  0.1.0's `createInbox` (and its other inbox-management calls) are
+  internal-visibility functions that fail to resolve cross-component on this
+  Convex version - runtime error `Couldn't resolve agentmail.lib.createInbox`,
+  reproduced directly against the deployed component with a throwaway probe
+  action rather than guessed at. Ruled out a real but separate issue along
+  the way (an unrelated, still-unused `@convex-dev/workflow` install from
+  Phase 0 was pulling in a conflicting nested `@convex-dev/workpool` version -
+  fixed by removing it, since Workflow isn't needed until Phase 9). Bisecting
+  by function visibility and type (public query, public mutation, internal
+  mutation, internal action) isolated the actual pattern: every *public*
+  function on the component resolves and works (confirmed `enqueueSend`, what
+  `sendMessage` - and so `sendRfq` - depends on), every *internal* one
+  doesn't. Since the package exposes no public inbox-creation call,
+  `convex/inbox.ts`'s `provisionInbox` now calls AgentMail's REST API
+  directly for just that one operation (same endpoint, auth header, and
+  payload shape the component's own internal `createInbox` uses), while
+  sending still goes through the real component end to end.
 
 ## Security note
 

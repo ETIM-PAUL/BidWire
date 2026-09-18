@@ -2,6 +2,7 @@ import { defineApp } from "convex/server";
 import { v } from "convex/values";
 import actionRetrier from "@convex-dev/action-retrier/convex.config";
 import rateLimiter from "@convex-dev/rate-limiter/convex.config";
+import agentmail from "@agentmail/convex/convex.config";
 import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
 
 const app = defineApp({
@@ -17,5 +18,6 @@ app.use(firecrawl, {
 });
 app.use(rateLimiter);
 app.use(actionRetrier);
+app.use(agentmail);
 
 export default app;

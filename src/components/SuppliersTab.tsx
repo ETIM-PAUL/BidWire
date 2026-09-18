@@ -2,6 +2,7 @@ import { useAction, useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
+import { RfqDrafts } from './RfqDrafts'
 
 const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = {
   firecrawl: 'bg-blue-950 text-blue-300 border-blue-900',
@@ -126,6 +127,8 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
           })}
         </div>
       )}
+
+      <RfqDrafts project={project} />
     </div>
   )
 }

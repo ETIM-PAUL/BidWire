@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
 
 const projectStatus = v.union(
@@ -75,5 +75,30 @@ export const getProject = query({
   returns: v.object(projectFields),
   handler: async (ctx, args) => {
     return requireProjectOwner(ctx, args.projectId);
+  },
+});
+
+// Internal: only called by inbox.ts's provisionInbox action, which has
+// already verified ownership via getProject before calling this.
+export const setInbox = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    inboxId: v.string(),
+    inboxAddress: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      inboxId: args.inboxId,
+      inboxAddress: args.inboxAddress,
+      status: "sourcing",
+    });
+    await ctx.db.insert("events", {
+      projectId: args.projectId,
+      type: "inbox_provisioned",
+      payload: { inboxAddress: args.inboxAddress },
+      createdAt: Date.now(),
+    });
+    return null;
   },
 });
