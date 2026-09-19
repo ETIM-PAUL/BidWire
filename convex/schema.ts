@@ -135,6 +135,8 @@ export default defineSchema({
       v.literal("counter"),
       v.literal("award"),
       v.literal("decline"),
+      // A reply to a question a supplier asked in their thread.
+      v.literal("reply"),
     ),
     subject: v.string(),
     body: v.string(),

@@ -2,8 +2,36 @@ import { useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
+import { NeedsReviewStrip } from './NeedsReviewStrip'
 
 type Selection = { kind: 'thread'; id: Id<'threads'> } | { kind: 'unmatched' } | null
+
+function MessageQuote({ messageId }: { messageId: Id<'messages'> }) {
+  const result = useQuery(api.quotes.getQuoteForMessage, { messageId })
+  if (!result) return null
+  return (
+    <div className="mt-2 rounded border border-emerald-900 bg-emerald-950/30 p-2 text-xs">
+      <p className="text-emerald-400 font-medium mb-1">
+        Extracted quote (v{result.quote.version})
+        {result.quote.deliveryCost !== undefined && ` · delivery ${result.quote.deliveryCost}`}
+        {result.quote.leadTimeDays !== undefined && ` · ${result.quote.leadTimeDays}d lead time`}
+      </p>
+      <ul className="space-y-0.5 text-neutral-400">
+        {result.lines.map((l) => (
+          <li key={l._id} className="flex justify-between gap-2">
+            <span className="truncate">{l.rawDescription}</span>
+            <span className="shrink-0">
+              {l.quantity} {l.unit} @ {l.unitPrice} = {l.total}
+              {l.lineItemId === undefined && (
+                <span className="text-amber-500 ml-1">(needs review)</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export function InboxTab({ project }: { project: Doc<'projects'> }) {
   const threads = useQuery(api.threads.listThreads, { projectId: project._id })
@@ -16,7 +44,9 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
   )
 
   return (
-    <div className="grid grid-cols-[280px_1fr] gap-4">
+    <div className="space-y-4">
+      <NeedsReviewStrip project={project} />
+      <div className="grid grid-cols-[280px_1fr] gap-4">
       <div className="space-y-1">
         <h3 className="text-sm font-medium text-neutral-300 mb-2">Threads</h3>
         {threads === undefined && <p className="text-sm text-neutral-500">Loading…</p>}
@@ -86,6 +116,7 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
                     {m.attachmentIds.length} attachment{m.attachmentIds.length > 1 ? 's' : ''}
                   </p>
                 )}
+                {m.direction === 'in' && <MessageQuote messageId={m._id} />}
               </div>
             ))}
           </div>
@@ -103,6 +134,7 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   )

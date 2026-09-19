@@ -21,6 +21,8 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_llm from "../lib/llm.js";
 import type * as lineItems from "../lineItems.js";
 import type * as projects from "../projects.js";
+import type * as quoteExtraction from "../quoteExtraction.js";
+import type * as quotes from "../quotes.js";
 import type * as rfq from "../rfq.js";
 import type * as suppliers from "../suppliers.js";
 import type * as threads from "../threads.js";
@@ -45,6 +47,8 @@ declare const fullApi: ApiFromModules<{
   "lib/llm": typeof lib_llm;
   lineItems: typeof lineItems;
   projects: typeof projects;
+  quoteExtraction: typeof quoteExtraction;
+  quotes: typeof quotes;
   rfq: typeof rfq;
   suppliers: typeof suppliers;
   threads: typeof threads;

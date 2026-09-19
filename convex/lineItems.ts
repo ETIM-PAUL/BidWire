@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireLineItemOwner, requireProjectOwner } from "./lib/auth";
 
 const lineItemFields = {
@@ -19,6 +19,21 @@ export const listLineItems = query({
   returns: v.array(v.object(lineItemFields)),
   handler: async (ctx, args) => {
     await requireProjectOwner(ctx, args.projectId);
+    const items = await ctx.db
+      .query("lineItems")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .take(1000);
+    return items.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+});
+
+// Internal: only called by quoteExtraction.ts's processInboundMessage, which
+// runs with no user identity (triggered by the AgentMail webhook), so the
+// ownership-checked public query above isn't usable there.
+export const listLineItemsInternal = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.array(v.object(lineItemFields)),
+  handler: async (ctx, args) => {
     const items = await ctx.db
       .query("lineItems")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

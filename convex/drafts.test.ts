@@ -63,6 +63,7 @@ describe("sendRfq DEMO_MODE allowlist (Phase 5 acceptance criterion)", () => {
     await asOwner.mutation(internal.drafts.insertDraft, {
       projectId,
       supplierId,
+      kind: "rfq",
       subject: "Quote request",
       body: "Please quote the following items...",
     });

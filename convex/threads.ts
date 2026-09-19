@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server";
 import { requireProjectOwner } from "./lib/auth";
 
 export const listThreads = query({
@@ -76,6 +76,15 @@ export const listMessagesForThread = query({
       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
       .take(500);
     return messages.sort((a, b) => a.receivedAt - b.receivedAt);
+  },
+});
+
+// Internal: only called by quoteExtraction.ts's processInboundMessage.
+export const getMessageById = internalQuery({
+  args: { messageId: v.id("messages") },
+  returns: v.union(v.object(messageFields), v.null()),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.messageId);
   },
 });
 

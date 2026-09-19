@@ -161,13 +161,24 @@ export const onMessageReceived = internalMutation({
       createdAt: receivedAt,
     });
 
-    if (attachments.length > 0) {
-      await ctx.scheduler.runAfter(0, internal.inbound.downloadAttachments, {
-        messageId,
-        inboxId,
-        providerMessageId,
-        attachments,
-      });
+    // Only a message matched to a known supplier can become a quote - an
+    // Unmatched message has nothing to attribute one to, so nothing is
+    // scheduled for it.
+    if (supplierId) {
+      if (attachments.length > 0) {
+        // downloadAttachments schedules processInboundMessage itself once
+        // done, so PDF content (if any) is in place before extraction runs.
+        await ctx.scheduler.runAfter(0, internal.inbound.downloadAttachments, {
+          messageId,
+          inboxId,
+          providerMessageId,
+          attachments,
+        });
+      } else {
+        await ctx.scheduler.runAfter(0, internal.quoteExtraction.processInboundMessage, {
+          messageId,
+        });
+      }
     }
     return null;
   },
@@ -219,6 +230,9 @@ export const downloadAttachments = internalAction({
         storageIds,
       });
     }
+    await ctx.runAction(internal.quoteExtraction.processInboundMessage, {
+      messageId: args.messageId,
+    });
     return null;
   },
 });
@@ -233,6 +247,27 @@ export const attachDownloadedFiles = internalMutation({
     }
     await ctx.db.patch(args.messageId, {
       attachmentIds: [...message.attachmentIds, ...args.storageIds],
+    });
+    return null;
+  },
+});
+
+// Internal: called by quoteExtraction.ts's processInboundMessage once
+// classification (and extraction, if applicable) is complete.
+export const markProcessed = internalMutation({
+  args: { messageId: v.id("messages"), classification: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      return null;
+    }
+    await ctx.db.patch(args.messageId, { processed: true });
+    await ctx.db.insert("events", {
+      projectId: message.projectId,
+      type: "message_classified",
+      payload: { messageId: args.messageId, classification: args.classification },
+      createdAt: Date.now(),
     });
     return null;
   },

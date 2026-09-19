@@ -3,7 +3,7 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { action } from "./_generated/server";
-import { structuredCall } from "./lib/llm";
+import { DRAFT_MODEL, structuredCall } from "./lib/llm";
 
 const rfqDraftSchema = {
   type: "object",
@@ -81,6 +81,7 @@ export const draftRfqs = action({
         .join("\n");
 
       const draft = await structuredCall<RfqDraft>({
+        model: DRAFT_MODEL,
         schemaName: "rfq_draft",
         schema: rfqDraftSchema,
         system:
@@ -103,6 +104,7 @@ export const draftRfqs = action({
       await ctx.runMutation(internal.drafts.insertDraft, {
         projectId: args.projectId,
         supplierId: supplier._id,
+        kind: "rfq",
         subject: draft.subject,
         body: draft.body,
       });

@@ -12,6 +12,7 @@ const draftKind = v.union(
   v.literal("counter"),
   v.literal("award"),
   v.literal("decline"),
+  v.literal("reply"),
 );
 const draftStatus = v.union(
   v.literal("pending"),
@@ -179,11 +180,14 @@ export const sendRfq = mutation({
   },
 });
 
-// Internal: only called by rfq.ts's draftRfqs action.
+// Internal: called by rfq.ts's draftRfqs action (kind "rfq") and
+// quoteExtraction.ts's processInboundMessage (kind "reply", for a
+// supplier's question).
 export const insertDraft = internalMutation({
   args: {
     projectId: v.id("projects"),
     supplierId: v.id("suppliers"),
+    kind: draftKind,
     subject: v.string(),
     body: v.string(),
   },
@@ -192,7 +196,7 @@ export const insertDraft = internalMutation({
     await ctx.db.insert("drafts", {
       projectId: args.projectId,
       supplierId: args.supplierId,
-      kind: "rfq",
+      kind: args.kind,
       subject: args.subject,
       body: args.body,
       status: "pending",

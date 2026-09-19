@@ -6,6 +6,11 @@ import { internalAction } from "../_generated/server";
 
 const DEFAULT_MODEL = "gpt-5.6-luna";
 
+// Per the build plan: Luna (DEFAULT_MODEL) for extraction/classification,
+// this mid-tier model only for customer-facing drafts (RFQs, replies to
+// supplier questions, follow-ups, negotiation, award/decline emails).
+export const DRAFT_MODEL = "gpt-5.6-terra";
+
 let client: OpenAI | undefined;
 
 function getClient(): OpenAI {

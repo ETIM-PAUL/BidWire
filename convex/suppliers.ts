@@ -73,6 +73,29 @@ export const getPublicConfig = query({
   },
 });
 
+// Internal: called by quoteExtraction.ts's processInboundMessage when a
+// reply is classified as a decline.
+export const markDeclined = internalMutation({
+  args: { supplierId: v.id("suppliers") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.supplierId, { status: "declined" });
+    return null;
+  },
+});
+
+// Internal: called by quoteExtraction.ts's processInboundMessage on a
+// quote/partial_quote classification, so every reply (not just the first)
+// keeps the supplier's status accurate.
+export const markReplied = internalMutation({
+  args: { supplierId: v.id("suppliers") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.supplierId, { status: "replied" });
+    return null;
+  },
+});
+
 // Internal: called by discovery.ts after Firecrawl extraction. Dedupe by
 // domain within the project so re-running discovery doesn't create
 // duplicate candidates for the same business.
