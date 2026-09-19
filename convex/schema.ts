@@ -23,7 +23,9 @@ export default defineSchema({
     inboxAddress: v.optional(v.string()),
     attachmentIds: v.optional(v.array(v.id("_storage"))),
     createdAt: v.number(),
-  }).index("by_owner", ["ownerId"]),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_inbox_id", ["inboxId"]),
 
   lineItems: defineTable({
     projectId: v.id("projects"),
@@ -73,9 +75,11 @@ export default defineSchema({
     .index("by_provider_thread_id", ["providerThreadId"]),
 
   messages: defineTable({
-    threadId: v.id("threads"),
+    // Unset for a message from a sender that doesn't match any known
+    // supplier - the "Unmatched" bucket in the Inbox tab.
+    threadId: v.optional(v.id("threads")),
     projectId: v.id("projects"),
-    supplierId: v.id("suppliers"),
+    supplierId: v.optional(v.id("suppliers")),
     providerMessageId: v.string(),
     direction: v.union(v.literal("out"), v.literal("in")),
     subject: v.string(),

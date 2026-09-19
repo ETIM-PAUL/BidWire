@@ -138,6 +138,35 @@ replies, and builds a price comparison that updates live as quotes arrive.
   directly for just that one operation (same endpoint, auth header, and
   payload shape the component's own internal `createInbox` uses), while
   sending still goes through the real component end to end.
+- **Phase 6 — Inbound email pipeline.** `convex/http.ts` wires
+  `onMessageReceived` (`convex/inbound.ts`) into the AgentMail webhook
+  handler already mounted in Phase 5; the component Svix-verifies and dedupes
+  by event ID before ever calling it, and we additionally dedupe on our own
+  `providerMessageId` before any write, per the build plan's own
+  non-negotiable idempotency rule - defense in depth, not just trusting a
+  third party's guarantee. Matches a reply to a supplier/thread by AgentMail's
+  provider thread ID first, falling back to sender address; a sender that
+  matches no known supplier lands in the "Unmatched" bucket (`threadId`/
+  `supplierId` now optional on `messages` - a schema change to accommodate
+  this) instead of being dropped. Reconciles the placeholder thread ID a
+  project's outbound RFQ was seeded with (Phase 5 doesn't know AgentMail's
+  real thread ID until the first reply) to the real one on first match, so
+  later replies in the same thread match directly. Attachment bytes are
+  downloaded in a scheduled action (`ctx.scheduler.runAfter(0, …)`, not the
+  webhook mutation itself - mutations can't `fetch`) into Convex file
+  storage. Inbox tab (`convex/threads.ts`, `src/components/InboxTab.tsx`):
+  threaded view per supplier plus the Unmatched bucket, reactive by
+  construction (plain `useQuery`).
+  Verified with `convex/inbound.test.ts` by calling the webhook mutation
+  directly (the component's own dispatch mechanism, not something a browser
+  test can reach) rather than guessing: replaying one payload 3 times
+  produces exactly one message row (the phase's literal acceptance
+  criterion), sender-matching creates a thread and flips the supplier to
+  `replied`, the reconciliation path is proven across two replies in the same
+  real thread, and an unrecognized sender lands in Unmatched. Note: full
+  live delivery (a real reply landing in the Inbox tab within seconds) isn't
+  verifiable against a local dev deployment - AgentMail's servers can't reach
+  `localhost`; that needs either a public deploy (Phase 13) or a tunnel.
 
 ## Security note
 

@@ -15,6 +15,7 @@ import type * as drafts from "../drafts.js";
 import type * as events from "../events.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as inbound from "../inbound.js";
 import type * as inbox from "../inbox.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_llm from "../lib/llm.js";
@@ -22,6 +23,7 @@ import type * as lineItems from "../lineItems.js";
 import type * as projects from "../projects.js";
 import type * as rfq from "../rfq.js";
 import type * as suppliers from "../suppliers.js";
+import type * as threads from "../threads.js";
 
 import type {
   ApiFromModules,
@@ -37,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   events: typeof events;
   files: typeof files;
   http: typeof http;
+  inbound: typeof inbound;
   inbox: typeof inbox;
   "lib/auth": typeof lib_auth;
   "lib/llm": typeof lib_llm;
@@ -44,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   rfq: typeof rfq;
   suppliers: typeof suppliers;
+  threads: typeof threads;
 }>;
 
 /**
