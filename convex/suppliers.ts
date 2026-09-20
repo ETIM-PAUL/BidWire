@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireProjectOwner } from "./lib/auth";
 
 const listPriceFields = {
@@ -37,6 +37,15 @@ export const listSuppliers = query({
       .query("suppliers")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .take(500);
+  },
+});
+
+// Internal: only called by followupCheck.ts's checkFollowUp.
+export const getSupplierById = internalQuery({
+  args: { supplierId: v.id("suppliers") },
+  returns: v.union(v.object(supplierFields), v.null()),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.supplierId);
   },
 });
 

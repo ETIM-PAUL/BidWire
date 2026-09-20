@@ -88,6 +88,27 @@ export const getMessageById = internalQuery({
   },
 });
 
+// Internal: only called by followupCheck.ts's checkFollowUp.
+export const getThreadById = internalQuery({
+  args: { threadId: v.id("threads") },
+  returns: v.union(
+    v.object({
+      _id: v.id("threads"),
+      _creationTime: v.number(),
+      projectId: v.id("projects"),
+      supplierId: v.id("suppliers"),
+      providerThreadId: v.string(),
+      lastMessageAt: v.number(),
+      followUpsSent: v.number(),
+      pendingFollowUpScheduledId: v.optional(v.id("_scheduled_functions")),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.threadId);
+  },
+});
+
 // The "Unmatched" bucket: inbound messages from senders that didn't match
 // any known supplier.
 export const listUnmatchedMessages = query({

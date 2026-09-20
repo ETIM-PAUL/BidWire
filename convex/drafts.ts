@@ -2,6 +2,7 @@ import { AgentMail } from "@agentmail/convex";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { scheduleFollowUpCheck } from "./followups";
 import { requireProjectOwner } from "./lib/auth";
 
 const agentmail = new AgentMail(components.agentmail);
@@ -176,6 +177,7 @@ export const sendRfq = mutation({
       payload: { supplierId: draft.supplierId, supplierName: supplier.name },
       createdAt: Date.now(),
     });
+    await scheduleFollowUpCheck(ctx, threadId);
     return { ok: true };
   },
 });

@@ -2,6 +2,7 @@ import { useAction, useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
+import { FollowUpDrafts } from './FollowUpDrafts'
 import { RfqDrafts } from './RfqDrafts'
 
 const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = {
@@ -15,6 +16,7 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
   const config = useQuery(api.suppliers.getPublicConfig)
   const discoverSuppliers = useAction(api.discovery.discoverSuppliers)
   const toggleSelected = useMutation(api.suppliers.toggleSupplierSelected)
+  const setAutoApprove = useMutation(api.followups.setAutoApproveFollowUps)
   const [discovering, setDiscovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,6 +54,17 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
         </button>
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer w-fit">
+        <input
+          type="checkbox"
+          checked={project.autoApproveFollowUps ?? false}
+          onChange={(e) =>
+            void setAutoApprove({ projectId: project._id, enabled: e.currentTarget.checked })
+          }
+        />
+        Auto-approve follow-up nudges to non-responding suppliers
+      </label>
 
       {suppliers === undefined ? (
         <p className="text-sm text-neutral-500">Loading…</p>
@@ -129,6 +142,7 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
       )}
 
       <RfqDrafts project={project} />
+      <FollowUpDrafts project={project} />
     </div>
   )
 }

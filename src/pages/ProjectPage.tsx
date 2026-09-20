@@ -1,4 +1,4 @@
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../convex/_generated/api'
@@ -15,7 +15,15 @@ export function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const projectId = id as Id<'projects'>
   const project = useQuery(api.projects.getProject, { projectId })
+  const cancelProject = useMutation(api.followups.cancelProject)
   const [tab, setTab] = useState<(typeof TABS)[number]>('Materials')
+
+  async function handleCancel() {
+    if (!window.confirm('Cancel this project? This stops any pending follow-up nudges.')) {
+      return
+    }
+    await cancelProject({ projectId })
+  }
 
   if (project === undefined) {
     return (
@@ -35,6 +43,14 @@ export function ProjectPage() {
         <span className="ml-auto text-xs uppercase tracking-wide text-neutral-500">
           {project.status}
         </span>
+        {project.status !== 'cancelled' && project.status !== 'awarded' && (
+          <button
+            onClick={() => void handleCancel()}
+            className="text-xs text-neutral-500 hover:text-red-400"
+          >
+            Cancel project
+          </button>
+        )}
       </header>
       <div className="grid grid-cols-[1fr_280px]">
         <div>

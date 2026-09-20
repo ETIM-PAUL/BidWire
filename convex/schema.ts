@@ -18,10 +18,12 @@ export default defineSchema({
       v.literal("rfq_sent"),
       v.literal("comparing"),
       v.literal("awarded"),
+      v.literal("cancelled"),
     ),
     inboxId: v.optional(v.string()),
     inboxAddress: v.optional(v.string()),
     attachmentIds: v.optional(v.array(v.id("_storage"))),
+    autoApproveFollowUps: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
@@ -69,6 +71,10 @@ export default defineSchema({
     providerThreadId: v.string(),
     lastMessageAt: v.number(),
     followUpsSent: v.number(),
+    // The currently-pending scheduled follow-up check for this thread, if
+    // any - lets a cancelled project actually cancel it, instead of just
+    // ignoring it when it eventually fires.
+    pendingFollowUpScheduledId: v.optional(v.id("_scheduled_functions")),
   })
     .index("by_project", ["projectId"])
     .index("by_supplier", ["supplierId"])
@@ -107,7 +113,8 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_supplier", ["supplierId"])
-    .index("by_message", ["messageId"]),
+    .index("by_message", ["messageId"])
+    .index("by_valid_until", ["validUntil"]),
 
   quoteLines: defineTable({
     quoteId: v.id("quotes"),

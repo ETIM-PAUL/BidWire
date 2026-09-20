@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
 
 const projectStatus = v.union(
@@ -9,6 +9,7 @@ const projectStatus = v.union(
   v.literal("rfq_sent"),
   v.literal("comparing"),
   v.literal("awarded"),
+  v.literal("cancelled"),
 );
 
 const projectFields = {
@@ -23,6 +24,7 @@ const projectFields = {
   inboxId: v.optional(v.string()),
   inboxAddress: v.optional(v.string()),
   attachmentIds: v.optional(v.array(v.id("_storage"))),
+  autoApproveFollowUps: v.optional(v.boolean()),
   createdAt: v.number(),
 };
 
@@ -75,6 +77,16 @@ export const getProject = query({
   returns: v.object(projectFields),
   handler: async (ctx, args) => {
     return requireProjectOwner(ctx, args.projectId);
+  },
+});
+
+// Internal: only called by followupCheck.ts's checkFollowUp and
+// expiry.ts's scanExpiringQuotes.
+export const getProjectById = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.union(v.object(projectFields), v.null()),
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.projectId);
   },
 });
 
