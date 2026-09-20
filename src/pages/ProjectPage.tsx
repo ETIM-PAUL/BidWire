@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { ActivityFeed } from '../components/ActivityFeed'
+import { CompareTab } from '../components/CompareTab'
 import { InboxTab } from '../components/InboxTab'
 import { MaterialsTab } from '../components/MaterialsTab'
 import { SuppliersTab } from '../components/SuppliersTab'
@@ -56,9 +57,7 @@ export function ProjectPage() {
             {tab === 'Materials' && <MaterialsTab project={project} />}
             {tab === 'Suppliers' && <SuppliersTab project={project} />}
             {tab === 'Inbox' && <InboxTab project={project} />}
-            {tab === 'Compare' && (
-              <p className="text-sm text-neutral-400">{tab} — coming soon.</p>
-            )}
+            {tab === 'Compare' && <CompareTab project={project} />}
           </main>
         </div>
         <aside className="border-l border-neutral-800 px-4 py-6">

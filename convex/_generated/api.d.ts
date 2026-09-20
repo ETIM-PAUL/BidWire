@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as boq from "../boq.js";
+import type * as comparison from "../comparison.js";
 import type * as discovery from "../discovery.js";
 import type * as drafts from "../drafts.js";
 import type * as events from "../events.js";
@@ -36,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   boq: typeof boq;
+  comparison: typeof comparison;
   discovery: typeof discovery;
   drafts: typeof drafts;
   events: typeof events;

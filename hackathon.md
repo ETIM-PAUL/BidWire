@@ -210,6 +210,32 @@ replies, and builds a price comparison that updates live as quotes arrive.
   proving containment holds even then, deterministically, rather than
   hoping a live model resists the injection (which isn't testable here
   without `OPENAI_API_KEY` anyway).
+- **Phase 8 — Live comparison matrix.** `convex/comparison.ts`'s
+  `comparisonMatrix` is a pure aggregation query - no writes, no LLM calls -
+  over each supplier's latest-version quote lines: rows are line items,
+  columns are suppliers with at least one quote, cells are unit prices, each
+  row carries its best/worst price and a fuzzy-matched reference price from
+  suppliers' Phase 4 scraped `listPrices`, each column carries a basket
+  total (items + that supplier's own delivery cost), coverage percent, and
+  which items are missing. The best single-supplier basket is gated to
+  100% coverage only - a partial quote with a lower raw total is never
+  eligible, proven by a dedicated test rather than left to eyeballing. The
+  best split-order basket takes the cheapest available price per row plus
+  delivery from every distinct supplier that split actually draws from (not
+  just one flat delivery fee).
+  Verified against the phase's literal acceptance criterion with a
+  hand-computed 3-supplier fixture in `comparison.test.ts` (basket totals,
+  which supplier wins full-coverage, the split total, and the exact savings
+  number all computed by hand in a comment above the test, then asserted).
+  The live-without-refresh behavior itself rests on the same `useQuery`
+  reactivity already proven in Phase 2 - what's new and tested here is that
+  the query is a correct, reactive function of current quote state.
+  `src/components/CompareTab.tsx`: best price highlighted per row, a cell
+  flash (compares each cell's price to its previous render, briefly
+  highlights ones that changed) so judges can see it update live, columns
+  sorted by basket total, missing-item coverage badges, row-level and
+  basket-level callout cards, and a single-supplier/cheapest-split toggle
+  that re-highlights the matrix accordingly.
 
 ## Security note
 
