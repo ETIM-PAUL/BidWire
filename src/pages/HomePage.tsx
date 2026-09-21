@@ -7,20 +7,23 @@ import type { Id } from '../../convex/_generated/dataModel'
 import { SignOutButton } from '../components/SignOutButton'
 
 export function HomePage() {
-  const projects = useQuery(api.projects.listMyProjects)\n  const isDemoAdmin = useQuery(api.suppliers.isDemoAdmin)
+  const projects = useQuery(api.projects.listMyProjects)
+  const isDemoAdmin = useQuery(api.suppliers.isDemoAdmin)
   const createProject = useMutation(api.projects.createProject)
   const launchSample = useAction(api.projects.launchSampleJob)
   const [sampleBusy, setSampleBusy] = useState(false)
   const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [files, setFiles] = useState<File[]>([])\n  const [error, setError] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const formData = new FormData(form)
-    setError(null)\n    setSubmitting(true)
+    setError(null)
+    setSubmitting(true)
     try {
       const attachmentIds: Id<'_storage'>[] = []
       for (const file of files) {
@@ -48,7 +51,14 @@ export function HomePage() {
     }
   }
 
-  async function handleSample() {\n    setSampleBusy(true)\n    setError(null)\n    try {\n      const id = await launchSample()\n      window.location.href = `/p/${id}`\n    } catch (e) { setError(e instanceof Error ? e.message : 'Could not create sample job.') } finally { setSampleBusy(false) }\n  }\n\n  return (
+  async function handleSample() {\n    setSampleBusy(true)
+    setError(null)
+    try {
+      const id = await launchSample()\n      window.location.href = `/p/${id}`
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not create sample job.') } finally { setSampleBusy(false) }
+  }
+
+  return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Bidwire</h1>
