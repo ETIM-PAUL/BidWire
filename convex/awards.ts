@@ -64,7 +64,7 @@ export const awardProject = mutation({
     await requireProjectOwner(ctx,args.projectId);
     const preview=await (async()=>{const items=await ctx.db.query("lineItems").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(1000);const quotes=await ctx.db.query("quotes").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(1000);const latest=new Map<string,any>();for(const q of quotes){const o=latest.get(q.supplierId as string);if(!o||q.version>o.version)latest.set(q.supplierId as string,q)}const lines=await ctx.db.query("quoteLines").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(5000);return {items,latest,lines}})();
     const suppliers=await ctx.db.query("suppliers").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(500);
-    const highestQuote=[...preview.latest.values()].map(q=>preview.lines.filter(l=>l.quoteId===q._id).reduce((n,l)=>n+l.total,0)+(q.deliveryCost??0)).sort((a,b)=>b-a)[0]??0;
+    const highestQuote=[...preview.latest.values()].map(q=>preview.lines.filter(l=>l.quoteId===q._id && l.lineItemId).reduce((n,l)=>n+l.total,0)+(q.deliveryCost??0)).sort((a,b)=>b-a)[0]??0;
     const publishedListTotal=preview.items.reduce((sum,item)=>{
       const matches=suppliers.flatMap(s=>(s.listPrices??[]).filter(lp=>hintMatchesLineItem(lp.itemHint, item.name)));
       const price=matches.sort((a,b)=>a.price-b.price)[0]?.price;
