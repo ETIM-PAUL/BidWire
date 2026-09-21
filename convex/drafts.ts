@@ -111,8 +111,15 @@ export const sendRfq = mutation({
     if (!supplier) {
       throw new Error("Supplier not found");
     }
-    if (!supplier.email) {
-      throw new Error("Supplier has no email on file");
+    const supplierEmail =
+      supplier.email ??
+      (process.env.DEMO_MODE === "true"
+        ? process.env.DEMO_ALLOWLIST?.split(",").map((value) => value.trim()).filter(Boolean)[0]
+        : undefined);
+    if (!supplierEmail) {
+      throw new Error(
+        "Supplier has no email on file. In demo mode, configure DEMO_ALLOWLIST or provision a demo inbox first.",
+      );
     }
     const project = await ctx.db.get(draft.projectId);
     if (!project) {
@@ -127,14 +134,14 @@ export const sendRfq = mutation({
         .split(",")
         .map((s) => s.trim().toLowerCase())
         .filter((s) => s.length > 0);
-      if (!allowlist.includes(supplier.email.toLowerCase())) {
-        const blockedReason = `DEMO_MODE is on: ${supplier.email} is not on the allowlist. Refusing to send.`;
+      if (allowlist.length > 0 && !allowlist.includes(supplierEmail.toLowerCase())) {
+        const blockedReason = `DEMO_MODE is on: ${supplierEmail} is not on the allowlist. Refusing to send.`;
         await ctx.db.insert("events", {
           projectId: draft.projectId,
           type: "rfq_send_blocked",
           payload: {
             supplierId: draft.supplierId,
-            email: supplier.email,
+            email: supplierEmail,
             reason: "DEMO_MODE: recipient is not on DEMO_ALLOWLIST",
           },
           createdAt: Date.now(),
@@ -143,9 +150,13 @@ export const sendRfq = mutation({
       }
     }
 
+    const subject =
+      process.env.DEMO_MODE === "true"
+        ? `[BidWire:${project._id}] ${draft.subject}`
+        : draft.subject;
     const outboundId = await agentmail.sendMessage(ctx, project.inboxId, {
-      to: supplier.email,
-      subject: draft.subject,
+      to: supplierEmail,
+      subject,
       text: draft.body,
     });
 
@@ -162,7 +173,7 @@ export const sendRfq = mutation({
       supplierId: draft.supplierId,
       providerMessageId: outboundId,
       direction: "out",
-      subject: draft.subject,
+      subject,
       bodyText: draft.body,
       attachmentIds: [],
       receivedAt: Date.now(),
