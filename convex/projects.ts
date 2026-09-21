@@ -47,7 +47,7 @@ export const createProject = mutation({
       currency: args.currency,
       attachmentIds: args.attachmentIds,
       status: "draft",
-      createdAt: Date.now(),
+      createdAt: Date.now(),\n      jobDescriptionCreatedAt: Date.now(),
     });
     await ctx.db.insert("events", {
       projectId,
