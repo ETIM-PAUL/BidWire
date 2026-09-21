@@ -54,7 +54,14 @@ export const awardProject = mutation({
   handler:async(ctx,args)=>{
     await requireProjectOwner(ctx,args.projectId);
     const preview=await (async()=>{const items=await ctx.db.query("lineItems").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(1000);const quotes=await ctx.db.query("quotes").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(1000);const latest=new Map<string,any>();for(const q of quotes){const o=latest.get(q.supplierId as string);if(!o||q.version>o.version)latest.set(q.supplierId as string,q)}const lines=await ctx.db.query("quoteLines").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(5000);return {items,latest,lines}})();
-    const awardId=await ctx.db.insert("awards",{projectId:args.projectId,mode:args.mode,deliveryAddress:args.deliveryAddress,deliveryDate:args.deliveryDate,totalSpend:0,highestQuote:0,publishedListTotal:0,awardedAt:Date.now()});
+    const suppliers=await ctx.db.query("suppliers").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(500);
+    const highestQuote=[...preview.latest.values()].map(q=>preview.lines.filter(l=>l.quoteId===q._id).reduce((n,l)=>n+l.total,0)+(q.deliveryCost??0)).sort((a,b)=>b-a)[0]??0;
+    const publishedListTotal=preview.items.reduce((sum,item)=>{
+      const matches=suppliers.flatMap(s=>(s.listPrices??[]).filter(lp=>lp.itemHint.toLowerCase().includes(item.name.toLowerCase())||item.name.toLowerCase().includes(lp.itemHint.toLowerCase())));
+      const price=matches.sort((a,b)=>a.price-b.price)[0]?.price;
+      return sum+(price??0)*item.quantity;
+    },0);
+    const awardId=await ctx.db.insert("awards",{projectId:args.projectId,mode:args.mode,deliveryAddress:args.deliveryAddress,deliveryDate:args.deliveryDate,totalSpend:0,highestQuote,publishedListTotal,awardedAt:Date.now()});
     let total=0;
     for(const item of preview.items){
       const candidates=preview.lines.filter(l=>l.lineItemId===item._id && preview.latest.get(l.supplierId as string)?._id===l.quoteId).sort((a,b)=>a.unitPrice-b.unitPrice);
