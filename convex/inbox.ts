@@ -122,9 +122,10 @@ export const provisionInbox = action({
     });
 
     if (process.env.DEMO_MODE === "true") {
-      const supplierEmails = available
-        .map((item) => item.email)
-        .filter((email) => email !== inbox.email);
+      const supplierEmails = available.map((item) => item.email);
+      if (!supplierEmails.includes(inbox.email)) {
+        supplierEmails.unshift(inbox.email);
+      }
       await ctx.runMutation(internal.suppliers.assignDemoSupplierEmails, {
         projectId: args.projectId,
         emails: supplierEmails,
