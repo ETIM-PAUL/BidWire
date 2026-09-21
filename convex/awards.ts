@@ -124,8 +124,10 @@ export const sendAwardDraft = mutation({
     }
     const msg:any={to:supplier.email,subject:draft.subject,text:draft.body};
     if(draft.attachmentId){
-      const blob=await ctx.storage.get(draft.attachmentId);
-      if(blob){ const bytes=new Uint8Array(await blob.arrayBuffer()); let bin=""; for(const b of bytes) bin+=String.fromCharCode(b); msg.attachments=[{content:btoa(bin),filename:"purchase-order.html",content_type:"text/html"}]; }
+      const attachmentUrl = await ctx.storage.getUrl(draft.attachmentId);
+      if (attachmentUrl) {
+        msg.attachments = [{ url: attachmentUrl, filename: "purchase-order.html", content_type: "text/html" }];
+      }
     }
     const outboundId=await agentmail.sendMessage(ctx,project.inboxId,msg);
     await ctx.db.patch(args.draftId,{status:"sent"});
