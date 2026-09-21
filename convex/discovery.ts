@@ -41,6 +41,8 @@ const supplierExtractionSchema = {
   additionalProperties: false,
 };
 
+type LineItemCategory = { category: string };
+
 type SupplierExtraction = {
   businessName: string;
   email: string | null;
@@ -82,8 +84,8 @@ export const discoverSuppliers = action({
     const categories = Array.from(
       new Set(
         lineItems
-          .map((item) => item.category.trim())
-          .filter((category) => category.length > 0),
+          .map((item: LineItemCategory) => item.category.trim())
+          .filter((category: string) => category.length > 0),
       ),
     );
 
