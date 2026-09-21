@@ -2,7 +2,24 @@ import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 
-function isDemoAdmin(identity: { email?: string | null } | null): boolean {\n  const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);\n  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}\n\nconst listPriceFields = {
+function isDemoAdmin(identity: { email?: string | null } | null): boolean {\n  const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);\n  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}\n\nfunction demoPdfBase64(text: string): string {
+  const esc=text.replace(/([\\()])/g,"\\$1");
+  const objects=[
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    "<< /Length "+String(("BT /F1 14 Tf 72 720 Td ("+esc+") Tj ET").length)+" >>\\nstream\\nBT /F1 14 Tf 72 720 Td ("+esc+") Tj ET\\nendstream",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+  ];
+  let pdf="%PDF-1.4\\n", offsets=[0];
+  for(let i=0;i<objects.length;i++){offsets.push(pdf.length);pdf+=(i+1)+" 0 obj\\n"+objects[i]+"\\nendobj\\n";}
+  const xref=pdf.length; pdf+="xref\\n0 "+String(objects.length+1)+"\\n0000000000 65535 f \\n";
+  for(let i=1;i<offsets.length;i++) pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \\n";
+  pdf+="trailer\\n<< /Size "+String(objects.length+1)+" /Root 1 0 R >>\\nstartxref\\n"+String(xref)+"\\n%%EOF";
+  return btoa(pdf);
+}
+
+const listPriceFields = {
   itemHint: v.string(),
   price: v.number(),
   unit: v.string(),
@@ -178,7 +195,7 @@ export const simulatorReplies = action({
     }
     const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(project.inboxId)+"/messages",{
       method:"POST",headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
-      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text,...(args.scenario==="pdf_quote"?{attachments:[{content:btoa("%PDF-1.4\\n1 0 obj\\n<< /Type /Catalog /Pages 2 0 R >>\\nendobj\\n2 0 obj\\n<< /Type /Pages /Kids [] /Count 0 >>\\nendobj\\ntrailer << /Root 1 0 R >>\\n%%EOF"),filename:"quote.pdf",content_type:"application/pdf"}]}:{})})
+      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text,...(args.scenario==="pdf_quote"?{attachments:[{content:demoPdfBase64("Demo supplier quotation"),filename:"quote.pdf",content_type:"application/pdf"}]}:{})})
     });
     if(!response.ok) throw new Error("AgentMail simulator send failed: "+(await response.text()).slice(0,300));
     return null;
