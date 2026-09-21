@@ -51,10 +51,12 @@ export function HomePage() {
     }
   }
 
-  async function handleSample() {\n    setSampleBusy(true)
+  async function handleSample() {
+    setSampleBusy(true)
     setError(null)
     try {
-      const id = await launchSample()\n      window.location.href = `/p/${id}`
+      const id = await launchSample()
+      window.location.href = `/p/${id}`
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not create sample job.') } finally { setSampleBusy(false) }
   }
 
@@ -142,7 +144,7 @@ export function HomePage() {
           {projects?.length === 0 && (
             <li className="px-4 py-3 text-sm text-neutral-500">No projects yet.</li>
           )}
-          {projects?.map((p) => (
+          {projects?.map((p: any) => (
             <li key={p._id}>
               <Link to={`/p/${p._id}`} className="block px-4 py-3 hover:bg-neutral-900">
                 <div className="flex items-center justify-between">

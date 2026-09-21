@@ -4,12 +4,12 @@ import OpenAI from "openai";
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 
-const DEFAULT_MODEL = "gpt-5.6-luna";
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 // Per the build plan: Luna (DEFAULT_MODEL) for extraction/classification,
 // this mid-tier model only for customer-facing drafts (RFQs, replies to
 // supplier questions, follow-ups, negotiation, award/decline emails).
-export const DRAFT_MODEL = "gpt-5.6-terra";
+export const DRAFT_MODEL = "gpt-4o-mini";
 
 let client: OpenAI | undefined;
 

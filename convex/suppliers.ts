@@ -5,7 +5,7 @@ import { requireProjectOwner } from "./lib/auth";
 
 function isDemoAdmin(identity: { email?: string | null } | null): boolean {
     const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
-  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}
+  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());}
 
 function demoPdfBase64(text: string): string {
   const esc=text.replace(/([\\()])/g,"\\$1");
@@ -257,8 +257,8 @@ export const ensureDemoSuppliers = internalMutation({
   },
 });
 
-export const isDemoAdmin = query({\n  args: {}, returns: v.boolean(),
-  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),\n});
+export const isDemoAdminQuery = query({  args: {}, returns: v.boolean(),
+  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity())});
 
 export const listDemoSuppliers = query({
   args: { projectId: v.id("projects") },
