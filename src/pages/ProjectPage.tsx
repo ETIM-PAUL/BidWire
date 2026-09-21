@@ -52,9 +52,9 @@ export function ProjectPage() {
           </button>
         )}
       </header>
-      <div className="grid grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div>
-          <nav className="flex gap-1 border-b border-neutral-800 px-6">
+          <nav className="flex gap-1 border-b border-neutral-800 px-3 sm:px-6 overflow-x-auto">
             {TABS.map((t) => (
               <button
                 key={t}
@@ -69,14 +69,14 @@ export function ProjectPage() {
               </button>
             ))}
           </nav>
-          <main className="px-6 py-8">
+          <main className="px-3 sm:px-6 py-6 sm:py-8">
             {tab === 'Materials' && <MaterialsTab project={project} />}
             {tab === 'Suppliers' && <SuppliersTab project={project} />}
             {tab === 'Inbox' && <InboxTab project={project} />}
             {tab === 'Compare' && <CompareTab project={project} />}
           </main>
         </div>
-        <aside className="border-l border-neutral-800 px-4 py-6">
+        <aside className="border-t lg:border-t-0 lg:border-l border-neutral-800 px-3 sm:px-4 py-5 lg:py-6">
           <ActivityFeed projectId={projectId} />
         </aside>
       </div>
