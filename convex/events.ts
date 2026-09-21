@@ -9,7 +9,7 @@ export const listEvents = query({
       _id: v.id("events"),
       _creationTime: v.number(),
       projectId: v.id("projects"),
-      type: v.string(),
+      type: v.union(v.literal("project_created"), v.literal("inbox_provisioned"), v.literal("message_received"), v.literal("message_unmatched"), v.literal("message_classified"), v.literal("project_awarded"), v.literal("award_send_blocked"), v.literal("po_sent"), v.literal("decline_sent"), v.literal("award_draft_created"), v.literal("boq_ready"), v.literal("rfq_sent"), v.literal("quote_received")),
       payload: v.any(),
       createdAt: v.number(),
     }),
