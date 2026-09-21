@@ -29,6 +29,10 @@ const cellFields = {
   unitPrice: v.number(),
   total: v.number(),
   matchConfidence: v.number(),
+  // The unit price from this supplier's PREVIOUS quote version for this
+  // same line item, if one exists - lets the UI show a "revised ↓ X%"
+  // badge when a supplier lowers a price in response to a negotiation.
+  previousUnitPrice: v.optional(v.number()),
 };
 
 const rowFields = {
@@ -92,6 +96,28 @@ export const comparisonMatrix = query({
       [...latestQuoteBySupplier.values()].map((q) => q._id as string),
     );
 
+    // Second-most-recent quote version per supplier (if any), so the matrix
+    // can show a "revised ↓ X%" badge when a price drops between versions -
+    // e.g. after a negotiation counter-offer.
+    const quotesBySupplier = new Map<string, Doc<"quotes">[]>();
+    for (const quote of allQuotes) {
+      const key = quote.supplierId as string;
+      if (!quotesBySupplier.has(key)) {
+        quotesBySupplier.set(key, []);
+      }
+      quotesBySupplier.get(key)!.push(quote);
+    }
+    const secondLatestQuoteBySupplier = new Map<string, Doc<"quotes">>();
+    for (const [key, supplierQuotes] of quotesBySupplier) {
+      const sorted = [...supplierQuotes].sort((a, b) => b.version - a.version);
+      if (sorted.length > 1) {
+        secondLatestQuoteBySupplier.set(key, sorted[1]);
+      }
+    }
+    const secondLatestQuoteIds = new Set(
+      [...secondLatestQuoteBySupplier.values()].map((q) => q._id as string),
+    );
+
     const allQuoteLines = await ctx.db
       .query("quoteLines")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -99,15 +125,25 @@ export const comparisonMatrix = query({
     // supplierId -> lineItemId -> quoteLine, restricted to each supplier's
     // LATEST quote version only (an older version's lines are superseded).
     const cellsBySupplier = new Map<string, Map<string, Doc<"quoteLines">>>();
+    // Same shape, but restricted to each supplier's SECOND-latest version -
+    // used only to compute previousUnitPrice below.
+    const prevCellsBySupplier = new Map<string, Map<string, Doc<"quoteLines">>>();
     for (const line of allQuoteLines) {
-      if (!line.lineItemId || !latestQuoteIds.has(line.quoteId as string)) {
+      if (!line.lineItemId) {
         continue;
       }
       const supplierKey = line.supplierId as string;
-      if (!cellsBySupplier.has(supplierKey)) {
-        cellsBySupplier.set(supplierKey, new Map());
+      if (latestQuoteIds.has(line.quoteId as string)) {
+        if (!cellsBySupplier.has(supplierKey)) {
+          cellsBySupplier.set(supplierKey, new Map());
+        }
+        cellsBySupplier.get(supplierKey)!.set(line.lineItemId as string, line);
+      } else if (secondLatestQuoteIds.has(line.quoteId as string)) {
+        if (!prevCellsBySupplier.has(supplierKey)) {
+          prevCellsBySupplier.set(supplierKey, new Map());
+        }
+        prevCellsBySupplier.get(supplierKey)!.set(line.lineItemId as string, line);
       }
-      cellsBySupplier.get(supplierKey)!.set(line.lineItemId as string, line);
     }
 
     const suppliers = await ctx.db
@@ -124,11 +160,13 @@ export const comparisonMatrix = query({
         .map((supplierKey) => {
           const line = cellsBySupplier.get(supplierKey)?.get(item._id as string);
           if (!line) return null;
+          const prevLine = prevCellsBySupplier.get(supplierKey)?.get(item._id as string);
           return {
             supplierId: line.supplierId,
             unitPrice: line.unitPrice,
             total: line.total,
             matchConfidence: line.matchConfidence,
+            previousUnitPrice: prevLine?.unitPrice,
           };
         })
         .filter((c): c is NonNullable<typeof c> => c !== null);

@@ -153,6 +153,11 @@ export default defineSchema({
       v.literal("sent"),
       v.literal("discarded"),
     ),
+    // Only set for kind:"counter". The specific price values the draft's
+    // AI-generated text cites, captured at generation time so both
+    // generation and send can validate them against real quoteLines - the
+    // guardrail that a negotiation draft may only cite real prices.
+    citedPrices: v.optional(v.array(v.number())),
   })
     .index("by_project", ["projectId"])
     .index("by_supplier", ["supplierId"]),

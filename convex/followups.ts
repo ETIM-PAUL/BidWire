@@ -1,12 +1,10 @@
-import { AgentMail } from "@agentmail/convex";
 import { v } from "convex/values";
-import { components, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { requireProjectOwner } from "./lib/auth";
-
-const agentmail = new AgentMail(components.agentmail);
+import { replyInThread } from "./lib/threadReply";
 
 const DEMO_FOLLOWUP_DELAY_MS = 2 * 60 * 1000; // 2 minutes
 const PROD_FOLLOWUP_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours
@@ -95,12 +93,6 @@ export const markSupplierSilent = internalMutation({
 
 type SendResult = { ok: boolean; blockedReason?: string };
 
-// The actual send: resolves AgentMail's real message ID for the original
-// RFQ (sending is async-enqueued, so this is only knowable after the fact)
-// to reply in-thread; falls back to a fresh "Re:" message if that isn't
-// resolvable yet, so a follow-up still goes out rather than silently
-// failing. Enforces the same DEMO_MODE allowlist as drafts.ts's sendRfq -
-// every outbound send in this app goes through that same guardrail.
 async function performFollowUpSend(ctx: MutationCtx, draftId: Id<"drafts">): Promise<SendResult> {
   const draft = await ctx.db.get(draftId);
   if (!draft) {
@@ -113,105 +105,30 @@ async function performFollowUpSend(ctx: MutationCtx, draftId: Id<"drafts">): Pro
     throw new Error("Draft is not pending");
   }
 
-  const supplier = await ctx.db.get(draft.supplierId);
-  if (!supplier) {
-    throw new Error("Supplier not found");
-  }
-  if (!supplier.email) {
-    throw new Error("Supplier has no email on file");
-  }
-  const project = await ctx.db.get(draft.projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  if (!project.inboxId) {
-    throw new Error("Project has no inbox yet");
+  const result = await replyInThread(ctx, {
+    projectId: draft.projectId,
+    supplierId: draft.supplierId,
+    blockedEventType: "rfq_send_blocked",
+    body: draft.body,
+  });
+  if (!result.ok) {
+    return result;
   }
 
-  if (process.env.DEMO_MODE === "true") {
-    const allowlist = (process.env.DEMO_ALLOWLIST ?? "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter((s) => s.length > 0);
-    if (!allowlist.includes(supplier.email.toLowerCase())) {
-      await ctx.db.insert("events", {
-        projectId: draft.projectId,
-        type: "rfq_send_blocked",
-        payload: {
-          supplierId: draft.supplierId,
-          email: supplier.email,
-          reason: "DEMO_MODE: recipient is not on DEMO_ALLOWLIST (follow-up)",
-        },
-        createdAt: Date.now(),
-      });
-      return {
-        ok: false,
-        blockedReason: `DEMO_MODE is on: ${supplier.email} is not on the allowlist. Refusing to send.`,
-      };
-    }
-  }
+  await ctx.db.patch(draftId, { status: "sent" });
 
   const thread = await ctx.db
     .query("threads")
     .withIndex("by_supplier", (q) => q.eq("supplierId", draft.supplierId))
     .first();
   if (!thread) {
+    // Unreachable in practice: replyInThread above already required one to
+    // exist. Narrows the type for what follows.
     throw new Error("No thread for this supplier yet");
   }
 
-  const threadMessages = await ctx.db
-    .query("messages")
-    .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
-    .take(200);
-  const originalOutbound = threadMessages
-    .filter((m) => m.direction === "out")
-    .sort((a, b) => a.receivedAt - b.receivedAt)[0];
-
-  let parentAgentmailMessageId: string | null = null;
-  if (originalOutbound) {
-    try {
-      const status = await agentmail.status(
-        ctx,
-        originalOutbound.providerMessageId as Parameters<typeof agentmail.status>[1],
-      );
-      parentAgentmailMessageId = status?.agentmailMessageId ?? null;
-    } catch {
-      // Couldn't resolve yet (still pending, or a transient API error) -
-      // fall through to the plain-send fallback below.
-    }
-  }
-
-  const fallbackSubject = originalOutbound ? `Re: ${originalOutbound.subject}` : draft.subject;
-  const newOutboundId = parentAgentmailMessageId
-    ? await agentmail.replyToMessage(ctx, project.inboxId, parentAgentmailMessageId, {
-        text: draft.body,
-      })
-    : await agentmail.sendMessage(ctx, project.inboxId, {
-        to: supplier.email,
-        subject: fallbackSubject,
-        text: draft.body,
-      });
-
-  await ctx.db.insert("messages", {
-    threadId: thread._id,
-    projectId: draft.projectId,
-    supplierId: draft.supplierId,
-    providerMessageId: newOutboundId,
-    direction: "out",
-    subject: fallbackSubject,
-    bodyText: draft.body,
-    attachmentIds: [],
-    receivedAt: Date.now(),
-    processed: true,
-  });
-
   const followUpsSent = thread.followUpsSent + 1;
-  await ctx.db.patch(thread._id, {
-    followUpsSent,
-    lastMessageAt: Date.now(),
-    pendingFollowUpScheduledId: undefined,
-  });
-  await ctx.db.patch(draftId, { status: "sent" });
+  await ctx.db.patch(thread._id, { followUpsSent, pendingFollowUpScheduledId: undefined });
   await ctx.db.insert("events", {
     projectId: draft.projectId,
     type: "follow_up_sent",

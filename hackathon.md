@@ -236,6 +236,45 @@ replies, and builds a price comparison that updates live as quotes arrive.
   sorted by basket total, missing-item coverage badges, row-level and
   basket-level callout cards, and a single-supplier/cheapest-split toggle
   that re-highlights the matrix accordingly.
+- **Phase 9 — Follow-ups & scheduling.** The plan calls for modeling the
+  per-supplier follow-up lifecycle with the Workflow component. Reinstalling
+  it turned out to be a hard blocker, not a judgment call: `@convex-dev/
+  workflow` peer-requires `@convex-dev/workpool@^0.4.x`, while
+  `@agentmail/convex` needs `^0.3.x` - non-overlapping ranges - and `npm
+  install` refused outright with an ERESOLVE conflict rather than silently
+  tolerating it (confirmed via the actual npm error, not assumed). Forcing
+  it past that warning to risk AgentMail - infrastructure Phases 5-7 already
+  depend on and proved working - for a nicer dashboard view was the wrong
+  trade, so follow-ups use Convex's own scheduler instead: it already
+  persists scheduled calls durably (survives restarts) and is inspectable
+  in the dashboard, just without Workflow's dedicated multi-step UI.
+  `convex/drafts.ts`'s `sendRfq` and `convex/followups.ts`'s
+  `performFollowUpSend` both call a shared `scheduleFollowUpCheck` helper
+  after a successful send (2 minutes in `DEMO_MODE`, 48 hours otherwise),
+  which also remembers the scheduled function's ID on the thread.
+  `convex/followupCheck.ts`'s `checkFollowUp` is the scheduled entry point:
+  if the supplier is still exactly `"rfq_sent"` (nothing happened since we
+  sent it), drafts a nudge and, if the project has auto-approve on, sends
+  it immediately via `performFollowUpSend` - which tries to reply in the
+  same email thread by resolving AgentMail's real message ID for the
+  original RFQ (only knowable after the fact, since sending is
+  async-enqueued), falling back to a fresh "Re:" message if that isn't
+  resolvable yet. After `MAX_FOLLOW_UPS` (2) the supplier is marked
+  `silent` instead of nudged again. `convex/expiry.ts` + `convex/crons.ts`
+  add a daily cron flagging quotes expiring in about a day via a
+  `quotes.by_valid_until` index.
+  `cancelProject` (the phase's other acceptance criterion) actually cancels
+  each of a project's pending follow-up checks via `ctx.scheduler.cancel`
+  and clears the tracked ID, not just flips a status flag - proven by a
+  test that schedules a real function, cancels it, advances time, and
+  confirms it never ran, alongside a control case (same setup, not
+  cancelled) proving the underlying mechanism does fire when it isn't.
+  Also closed a re-check finding of my own: unlike `rfq.ts`'s `draftRfqs`,
+  the first version of `checkFollowUp` had no guard against drafting a
+  second nudge if it ever ran twice for the same round - fixed with the
+  same existing-pending-draft check `draftRfqs` already uses, and it's
+  provably reachable in a test without an LLM call (the guard returns
+  before the drafting call).
 
 ## Security note
 
