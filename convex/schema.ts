@@ -189,7 +189,7 @@ export default defineSchema({
 
   events: defineTable({
     projectId: v.id("projects"),
-    type: v.union(v.literal("project_created"), v.literal("inbox_provisioned"), v.literal("message_received"), v.literal("message_unmatched"), v.literal("message_classified"), v.literal("project_awarded"), v.literal("award_send_blocked"), v.literal("po_sent"), v.literal("decline_sent"), v.literal("award_draft_created"), v.literal("boq_ready"), v.literal("rfq_sent"), v.literal("quote_received"), v.literal("project_cancelled"), v.literal("follow_up_sent"), v.literal("supplier_selected"), v.literal("draft_created"), v.literal("boq_generated"), v.literal("rfq_send_blocked")),
+    type: v.union(v.literal("project_created"), v.literal("inbox_provisioned"), v.literal("message_received"), v.literal("message_unmatched"), v.literal("message_classified"), v.literal("project_awarded"), v.literal("award_send_blocked"), v.literal("po_sent"), v.literal("decline_sent"), v.literal("award_draft_created"), v.literal("boq_ready"), v.literal("rfq_sent"), v.literal("quote_received"), v.literal("project_cancelled"), v.literal("follow_up_sent"), v.literal("supplier_selected"), v.literal("draft_created"), v.literal("boq_generated"), v.literal("rfq_send_blocked"), v.literal("quote_expiring"), v.literal("negotiation_send_blocked"), v.literal("negotiation_sent")),
     payload: v.any(),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
