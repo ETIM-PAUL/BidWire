@@ -2,6 +2,7 @@ import { useQuery } from 'convex/react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
+import { NegotiationDrafts, NegotiateButton } from './NegotiationDrafts'
 
 type AwardMode = 'single' | 'split'
 
@@ -180,6 +181,12 @@ export function CompareTab({ project }: { project: Doc<'projects'> }) {
                     cell &&
                     row.bestSupplierId === col.supplierId &&
                     splitSupplierIds.has(col.supplierId)
+                  const revisionPercent =
+                    cell?.previousUnitPrice !== undefined &&
+                    cell.previousUnitPrice > 0 &&
+                    cell.unitPrice < cell.previousUnitPrice
+                      ? Math.round(((cell.previousUnitPrice - cell.unitPrice) / cell.previousUnitPrice) * 100)
+                      : 0
                   return (
                     <td
                       key={col.supplierId}
@@ -193,12 +200,29 @@ export function CompareTab({ project }: { project: Doc<'projects'> }) {
                     >
                       {cell ? (
                         <>
-                          {cell.unitPrice.toLocaleString()}
+                          <div className="flex items-center gap-2">
+                            <span>{cell.unitPrice.toLocaleString()}</span>
+                            {revisionPercent > 0 && (
+                              <span
+                                className="text-[10px] text-emerald-400"
+                                title={`Previous quoted unit price: ${cell.previousUnitPrice?.toLocaleString()}`}
+                              >
+                                revised ↓ {revisionPercent}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-2">
                           {cell.matchConfidence < 0.7 && (
                             <span className="text-amber-500 ml-1" title="Needs review">
                               ⚠
                             </span>
                           )}
+                          <NegotiateButton
+                            projectId={project._id}
+                            supplierId={col.supplierId}
+                            lineItemId={row.lineItemId}
+                          />
+                          </div>
                         </>
                       ) : (
                         <span className="text-neutral-700">—</span>
@@ -211,6 +235,7 @@ export function CompareTab({ project }: { project: Doc<'projects'> }) {
           </tbody>
         </table>
       </div>
+      <NegotiationDrafts project={project} />
     </div>
   )
 }
