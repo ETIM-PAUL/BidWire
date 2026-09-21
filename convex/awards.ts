@@ -91,7 +91,7 @@ export const getAward = query({
 });
 
 export const insertAwardDraft = internalMutation({
-  args:{projectId:v.id("projects"),supplierId:v.id("suppliers"),awardId:v.id("awards"),kind:v.union(v.literal("award"),v.literal("decline")),subject:v.string(),body:v.string()},
+  args:{projectId:v.id("projects"),supplierId:v.id("suppliers"),awardId:v.id("awards"),kind:v.union(v.literal("award"),v.literal("decline")),subject:v.string(),body:v.string(),attachmentId:v.optional(v.id("_storage"))},
   returns:v.null(),
   handler:async(ctx,args)=>{await ctx.db.insert("drafts",{projectId:args.projectId,supplierId:args.supplierId,kind:args.kind,subject:args.subject,body:args.body,status:"pending",attachmentId:args.attachmentId});return null;}
 });
