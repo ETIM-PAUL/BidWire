@@ -193,6 +193,7 @@ export const insertDraft = internalMutation({
     kind: draftKind,
     subject: v.string(),
     body: v.string(),
+    citedPrices: v.optional(v.array(v.number())),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -203,6 +204,7 @@ export const insertDraft = internalMutation({
       subject: args.subject,
       body: args.body,
       status: "pending",
+      citedPrices: args.citedPrices,
     });
     return null;
   },
