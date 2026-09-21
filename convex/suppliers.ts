@@ -155,7 +155,7 @@ export const insertDiscoveredSupplier = internalMutation({
       source: "firecrawl",
       categories: args.categories,
       listPrices: args.listPrices.length > 0 ? args.listPrices : undefined,
-      status: "candidate",
+      status: "selected",
     });
     return null;
   },
