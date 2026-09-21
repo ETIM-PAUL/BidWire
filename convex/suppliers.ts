@@ -152,6 +152,21 @@ function extractDomain(url: string): string {
   }
 }
 
+
+export const simulatorReplies = mutation({
+  args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("decline"), v.literal("revised_price")) },
+  returns: v.null(),
+  handler: async (ctx,args) => {
+    await requireProjectOwner(ctx,args.projectId);
+    const supplier=await ctx.db.get(args.supplierId); if(!supplier || supplier.source!=="demo") throw new Error("Simulator is limited to demo suppliers.");
+    const project=await ctx.db.get(args.projectId); if(!project?.inboxId) throw new Error("Project inbox is not ready.");
+    const thread=await ctx.db.query("threads").withIndex("by_supplier",q=>q.eq("supplierId",supplier._id)).first();
+    if(!thread) throw new Error("No supplier thread exists yet. Send an RFQ first.");
+    await ctx.db.insert("events",{projectId:args.projectId,type:"message_received",payload:{simulator:true,scenario:args.scenario,supplierId:supplier._id},createdAt:Date.now()});
+    return null;
+  },
+});
+
 const DEMO_SUPPLIER_NAMES = [
   "Ace Building Supply (Demo)",
   "Metro Hardware (Demo)",
