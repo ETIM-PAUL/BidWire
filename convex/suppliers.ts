@@ -5,7 +5,8 @@ import { requireProjectOwner } from "./lib/auth";
 
 function isDemoAdmin(identity: { email?: string | null } | null): boolean {
     const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
-  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}
+  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());
+}
 
 function demoPdfBase64(text: string): string {
   const esc=text.replace(/([\\()])/g,"\\$1");
@@ -182,7 +183,7 @@ export const simulatorReplies = action({
     const identity=await ctx.auth.getUserIdentity();
     if(!isDemoAdmin(identity)) throw new Error("Demo simulator is admin-only.");
     const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
-    const supplier=await ctx.runQuery(api.suppliers.listDemoSuppliers,{projectId:args.projectId}).then(xs=>xs.find(x=>x._id===args.supplierId));
+    const supplier=await ctx.runQuery(api.suppliers.listDemoSuppliers,{projectId:args.projectId}).then((xs) => xs.find((x: (typeof xs)[number]) => x._id===args.supplierId));
     if(!supplier) throw new Error("Simulator is limited to demo suppliers.");
     if(!project.inboxId) throw new Error("Project inbox is not ready.");
     if(!supplier.email) throw new Error("Demo supplier has no inbox address.");
@@ -197,7 +198,7 @@ export const simulatorReplies = action({
       text="Thanks for the RFQ. Unfortunately we are unable to supply this order at this time. Please keep us in mind for a future project.";
     } else {
       const revised=args.scenario==="revised_price";
-      text="Dear Bidwire,\\n\\nPlease find our "+(revised?"revised ":"")+"quotation:\\n\\n"+selected.map((x,i)=>x.name+" — "+x.quantity+" "+x.unit+" @ "+price(i)*(revised?0.94:1)+" NGN").join("\\n")+"\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier";
+      text="Dear Bidwire,\\n\\nPlease find our "+(revised?"revised ":"")+"quotation:\\n\\n"+selected.map((x: (typeof selected)[number], i: number)=>x.name+" — "+x.quantity+" "+x.unit+" @ "+price(i)*(revised?0.94:1)+" NGN").join("\\n")+"\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier";
       if(args.scenario==="pdf_quote") subject="Quotation attached — "+project.name;
     }
     const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(supplier.email)+"/messages",{
@@ -257,8 +258,10 @@ export const ensureDemoSuppliers = internalMutation({
   },
 });
 
-export const isDemoAdmin = query({\n  args: {}, returns: v.boolean(),
-  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),\n});
+export const isDemoAdmin = query({
+  args: {}, returns: v.boolean(),
+  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),
+});
 
 export const listDemoSuppliers = query({
   args: { projectId: v.id("projects") },
