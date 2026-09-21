@@ -160,6 +160,7 @@ export default defineSchema({
     // generation and send can validate them against real quoteLines - the
     // guardrail that a negotiation draft may only cite real prices.
     citedPrices: v.optional(v.array(v.number())),
+    attachmentId: v.optional(v.id("_storage")),
   })
     .index("by_project", ["projectId"])
     .index("by_supplier", ["supplierId"]),
