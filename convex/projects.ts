@@ -1,6 +1,8 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
+import type { Id } from "./_generated/dataModel";
 
 const projectStatus = v.union(
   v.literal("draft"),
@@ -112,5 +114,36 @@ export const setInbox = internalMutation({
       createdAt: Date.now(),
     });
     return null;
+  },
+});
+
+export const createSampleBathroomProject = internalMutation({
+  args: {},
+  returns: v.id("projects"),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const now = Date.now();
+    const projectId = await ctx.db.insert("projects", {
+      ownerId: userId,
+      name: "Sample Bathroom Renovation",
+      jobDescription: "Full bathroom renovation: replace floor and wall tiles, install a close-coupled toilet, vanity basin, shower mixer and screen, new floor drain, plumbing fittings, waterproofing and repainting. Mid-range finish for a typical residential bathroom.",
+      location: "Port Harcourt",
+      currency: "NGN",
+      status: "draft",
+      createdAt: now,
+    });
+    await ctx.db.insert("events", { projectId, type: "project_created", payload: { name: "Sample Bathroom Renovation", sample: true }, createdAt: now });
+    return projectId;
+  },
+});
+
+export const launchSampleJob = action({
+  args: {},
+  returns: v.id("projects"),
+  handler: async (ctx) => {
+    const projectId: Id<"projects"> = await ctx.runMutation(internal.projects.createSampleBathroomProject, {});
+    await ctx.runAction(api.boq.generateBoq, { projectId });
+    await ctx.runMutation(internal.suppliers.ensureDemoSuppliers, { projectId });
+    return projectId;
   },
 });

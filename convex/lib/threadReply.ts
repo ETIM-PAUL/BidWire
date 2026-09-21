@@ -24,7 +24,7 @@ export async function replyInThread(
   args: {
     projectId: Id<"projects">;
     supplierId: Id<"suppliers">;
-    blockedEventType: string;
+    blockedEventType: "rfq_send_blocked" | "award_send_blocked" | "negotiation_send_blocked";
     body: string;
   },
 ): Promise<ThreadReplyResult> {
