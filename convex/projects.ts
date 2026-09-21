@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api, internal } from "./_generated/api";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
 
 const projectStatus = v.union(
@@ -132,6 +132,17 @@ export const createSampleBathroomProject = mutation({
       createdAt: now,
     });
     await ctx.db.insert("events", { projectId, type: "project_created", payload: { name: "Sample Bathroom Renovation", sample: true }, createdAt: now });
+    return projectId;
+  },
+});
+
+export const launchSampleJob = action({
+  args: {},
+  returns: v.id("projects"),
+  handler: async (ctx) => {
+    const projectId = await ctx.runMutation(api.projects.createSampleBathroomProject, {});
+    await ctx.runAction(api.boq.generateBoq, { projectId });
+    await ctx.runMutation(internal.suppliers.ensureDemoSuppliers, { projectId });
     return projectId;
   },
 });
