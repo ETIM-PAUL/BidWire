@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 
-const listPriceFields = {
+function isDemoAdmin(identity: { email?: string | null } | null): boolean {\n  const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);\n  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}\n\nconst listPriceFields = {
   itemHint: v.string(),
   price: v.number(),
   unit: v.string(),
@@ -157,7 +157,7 @@ export const simulatorReplies = action({
   args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("pdf_quote"), v.literal("decline"), v.literal("revised_price")) },
   returns: v.null(),
   handler: async (ctx,args) => {
-    const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
+    const identity=await ctx.auth.getUserIdentity();\n    if(!isDemoAdmin(identity)) throw new Error("Demo simulator is admin-only.");\n    const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
     const supplier=await ctx.runQuery(api.suppliers.listDemoSuppliers,{projectId:args.projectId}).then(xs=>xs.find(x=>x._id===args.supplierId));
     if(!supplier) throw new Error("Simulator is limited to demo suppliers.");
     if(!project.inboxId) throw new Error("Project inbox is not ready.");
@@ -178,7 +178,7 @@ export const simulatorReplies = action({
     }
     const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(project.inboxId)+"/messages",{
       method:"POST",headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
-      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text})
+      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text,...(args.scenario==="pdf_quote"?{attachments:[{content:btoa("%PDF-1.4\\n1 0 obj\\n<< /Type /Catalog /Pages 2 0 R >>\\nendobj\\n2 0 obj\\n<< /Type /Pages /Kids [] /Count 0 >>\\nendobj\\ntrailer << /Root 1 0 R >>\\n%%EOF"),filename:"quote.pdf",content_type:"application/pdf"}]}:{})})
     });
     if(!response.ok) throw new Error("AgentMail simulator send failed: "+(await response.text()).slice(0,300));
     return null;
@@ -233,7 +233,7 @@ export const ensureDemoSuppliers = internalMutation({
   },
 });
 
-export const listDemoSuppliers = query({
+export const isDemoAdmin = query({\n  args: {}, returns: v.boolean(),\n  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),\n});\n\nexport const listDemoSuppliers = query({
   args: { projectId: v.id("projects") },
   returns: v.array(v.object(supplierFields)),
   handler: async (ctx,args) => {
