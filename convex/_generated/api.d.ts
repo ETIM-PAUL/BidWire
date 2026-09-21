@@ -9,6 +9,8 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as awards from "../awards.js";
+import type * as awardDrafts from "../awardDrafts.js";
 import type * as boq from "../boq.js";
 import type * as comparison from "../comparison.js";
 import type * as crons from "../crons.js";
@@ -43,6 +45,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  awards: typeof awards;
+  awardDrafts: typeof awardDrafts;
   boq: typeof boq;
   comparison: typeof comparison;
   crons: typeof crons;

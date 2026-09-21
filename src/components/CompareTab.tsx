@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { NegotiationDrafts, NegotiateButton } from './NegotiationDrafts'
+import { AwardPanel } from './AwardPanel'
 
 type AwardMode = 'single' | 'split'
 
@@ -236,6 +237,7 @@ export function CompareTab({ project }: { project: Doc<'projects'> }) {
         </table>
       </div>
       <NegotiationDrafts project={project} />
+      <AwardPanel project={project} />
     </div>
   )
 }

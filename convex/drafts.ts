@@ -32,6 +32,7 @@ const draftFields = {
   body: v.string(),
   status: draftStatus,
   citedPrices: v.optional(v.array(v.number())),
+  attachmentId: v.optional(v.id("_storage")),
 };
 
 export const listDrafts = query({
