@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from 'convex/react'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { SignOutButton } from '../components/SignOutButton'
 export function HomePage() {
   const projects = useQuery(api.projects.listMyProjects)
   const createProject = useMutation(api.projects.createProject)
-  const createSample = useMutation(api.projects.createSampleBathroomProject)
+  const launchSample = useAction(api.projects.launchSampleJob)
   const [sampleBusy, setSampleBusy] = useState(false)
   const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const [showForm, setShowForm] = useState(false)
@@ -48,7 +48,7 @@ export function HomePage() {
     }
   }
 
-  async function handleSample() {\n    setSampleBusy(true)\n    try {\n      const id = await createSample()\n      window.location.href = `/p/${id}`\n    } finally { setSampleBusy(false) }\n  }\n\n  return (
+  async function handleSample() {\n    setSampleBusy(true)\n    try {\n      const id = await launchSample()\n      window.location.href = `/p/${id}`\n    } finally { setSampleBusy(false) }\n  }\n\n  return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Bidwire</h1>
