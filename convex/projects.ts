@@ -122,7 +122,6 @@ export const createSampleBathroomProject = internalMutation({
   returns: v.id("projects"),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
-    const existing = await ctx.db.query("projects").withIndex("by_owner", q => q.eq("ownerId", userId)).take(50);
     const now = Date.now();
     const projectId = await ctx.db.insert("projects", {
       ownerId: userId,

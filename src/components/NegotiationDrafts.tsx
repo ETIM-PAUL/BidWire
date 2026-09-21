@@ -10,33 +10,11 @@ export function NegotiationDrafts({ project }: { project: Doc<'projects'> }) {
   const sendNegotiation = useMutation(api.negotiate.sendNegotiationDraft)
   const updateDraft = useMutation(api.drafts.updateDraft)
   const discardDraft = useMutation(api.drafts.discardDraft)
-  const [busy, setBusy] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const pending = drafts?.filter((d) => d.kind === 'counter' && d.status === 'pending') ?? []
   const supplierName = (id: Id<'suppliers'>) =>
     suppliers?.find((s) => s._id === id)?.name ?? 'Supplier'
-
-  async function handleGenerate(supplierId: Id<'suppliers'>, lineItemId?: Id<'lineItems'>) {
-    const key = lineItemId ? `${supplierId}:${lineItemId}` : supplierId
-    setBusy(key)
-    setErrors((prev) => ({ ...prev, [key]: '' }))
-    try {
-      const result = await negotiate({
-        projectId: project._id,
-        supplierId,
-        lineItemIds: lineItemId ? [lineItemId] : undefined,
-      })
-      if (!result.ok) setErrors((prev) => ({ ...prev, [key]: result.reason }))
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        [key]: err instanceof Error ? err.message : 'Could not generate negotiation draft.',
-      }))
-    } finally {
-      setBusy(null)
-    }
-  }
 
   async function handleSend(draftId: Id<'drafts'>) {
     setErrors((prev) => ({ ...prev, [draftId]: '' }))

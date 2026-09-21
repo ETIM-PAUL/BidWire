@@ -19,7 +19,7 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState<string|null>(null)
 
-  if(!preview) return <p className="text-sm text-neutral-500">Loading award…</p>
+  if(preview === undefined) return <p className="text-sm text-neutral-500">Loading award…</p>
   const pending=drafts?.filter(d=>(d.kind==='award'||d.kind==='decline')&&d.status==='pending')??[]
   if(savedAward) return <div className="space-y-4 border-t border-neutral-800 pt-5">
     <div className="rounded-lg border border-emerald-900 bg-emerald-950/30 p-4"><p className="text-emerald-400 text-sm font-medium">Project awarded</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm"><div><p className="text-xs text-neutral-500">Total spend</p><p className="text-neutral-200 font-medium">{savedAward.totalSpend.toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs highest quote</p><p className="text-neutral-200 font-medium">{Math.max(0,savedAward.highestQuote-savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs published</p><p className="text-neutral-200 font-medium">{Math.max(0,savedAward.publishedListTotal-savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Time to award</p><p className="text-neutral-200 font-medium">{Math.round((savedAward.awardedAt-project.createdAt)/3600000)}h</p></div></div></div>
