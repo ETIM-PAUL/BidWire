@@ -192,14 +192,15 @@ export const simulatorReplies = action({
     const lines=await ctx.runQuery(api.lineItems.listLineItems,{projectId:args.projectId});
     const selected=lines.slice(0,Math.min(lines.length,5));
     const price=(i:number)=>10000+i*2500;
-    let subject="Quotation — "+project.name, text="";
+    const subjectPrefix = "[BidWire:"+project._id+"] ";
+    let subject=subjectPrefix+"Quotation — "+project.name, text="";
     if(args.scenario==="decline"){
-      subject="Unable to quote — "+project.name;
+      subject=subjectPrefix+"Unable to quote — "+project.name;
       text="Thanks for the RFQ. Unfortunately we are unable to supply this order at this time. Please keep us in mind for a future project.";
     } else {
       const revised=args.scenario==="revised_price";
       text="Dear Bidwire,\\n\\nPlease find our "+(revised?"revised ":"")+"quotation:\\n\\n"+selected.map((x: (typeof selected)[number], i: number)=>x.name+" — "+x.quantity+" "+x.unit+" @ "+price(i)*(revised?0.94:1)+" NGN").join("\\n")+"\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier";
-      if(args.scenario==="pdf_quote") subject="Quotation attached — "+project.name;
+      if(args.scenario==="pdf_quote") subject=subjectPrefix+"Quotation attached — "+project.name;
     }
     const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(supplier.email)+"/messages",{
       method:"POST",headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
