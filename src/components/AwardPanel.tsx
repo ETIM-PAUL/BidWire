@@ -6,6 +6,7 @@ import type { Doc, Id } from '../../convex/_generated/dataModel'
 export function AwardPanel({ project }: { project: Doc<'projects'> }) {
   const preview=useQuery(api.awards.getAwardPreview,{projectId:project._id})
   const drafts=useQuery(api.drafts.listDrafts,{projectId:project._id})
+  const savedAward=useQuery(api.awards.getAward,{projectId:project._id})
   const award=useMutation(api.awards.awardProject)
   const generate=useAction(api.awardDrafts.generateAwardDrafts)
   const send=useMutation(api.awards.sendAwardDraft)
@@ -19,6 +20,7 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
   const [error,setError]=useState<string|null>(null)
 
   if(!preview) return <p className="text-sm text-neutral-500">Loading award…</p>
+  if(savedAward) return <div className="space-y-4 border-t border-neutral-800 pt-5"><div className="rounded-lg border border-emerald-900 bg-emerald-950/30 p-4"><p className="text-emerald-400 text-sm font-medium">Project awarded</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm"><div><p className="text-xs text-neutral-500">Total spend</p><p className="text-neutral-200 font-medium">{savedAward.totalSpend.toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs highest quote</p><p className="text-neutral-200 font-medium">{Math.max(0,savedAward.highestQuote-savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs published</p><p className="text-neutral-200 font-medium">{Math.max(0,savedAward.publishedListTotal-savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Time to award</p><p className="text-neutral-200 font-medium">{Math.round((savedAward.awardedAt-project.createdAt)/3600000)}h</p></div></div></div></div>
 
   const selectedRows=mode==='single' && supplierId
     ? preview.rows.filter(r=>r.supplierId===supplierId)
