@@ -134,3 +134,16 @@ export const sendAwardDraft = mutation({
     return {ok:true};
   }
 });
+
+export const getAwardLines = query({
+  args:{awardId:v.id("awards")},
+  returns:v.array(v.object({supplierId:v.id("suppliers"),lineItemId:v.id("lineItems"),name:v.string(),quantity:v.number(),unit:v.string(),unitPrice:v.number(),total:v.number()})),
+  handler:async(ctx,args)=>{
+    const award=await ctx.db.get(args.awardId); if(!award) throw new Error("Award not found");
+    await requireProjectOwner(ctx,award.projectId);
+    const lines=await ctx.db.query("awardLines").withIndex("by_award",q=>q.eq("awardId",args.awardId)).take(5000);
+    const items=await ctx.db.query("lineItems").withIndex("by_project",q=>q.eq("projectId",award.projectId)).take(1000);
+    const names=new Map(items.map(i=>[i._id as string,i.name]));
+    return lines.map(l=>({supplierId:l.supplierId,lineItemId:l.lineItemId,name:names.get(l.lineItemId as string)??"Item",quantity:l.quantity,unit:l.unit,unitPrice:l.unitPrice,total:l.total}));
+  }
+});
