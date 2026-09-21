@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 
 const listPriceFields = {
@@ -153,16 +153,34 @@ function extractDomain(url: string): string {
 }
 
 
-export const simulatorReplies = mutation({
-  args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("decline"), v.literal("revised_price")) },
+export const simulatorReplies = action({
+  args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("pdf_quote"), v.literal("decline"), v.literal("revised_price")) },
   returns: v.null(),
   handler: async (ctx,args) => {
-    await requireProjectOwner(ctx,args.projectId);
-    const supplier=await ctx.db.get(args.supplierId); if(!supplier || supplier.source!=="demo") throw new Error("Simulator is limited to demo suppliers.");
-    const project=await ctx.db.get(args.projectId); if(!project?.inboxId) throw new Error("Project inbox is not ready.");
-    const thread=await ctx.db.query("threads").withIndex("by_supplier",q=>q.eq("supplierId",supplier._id)).first();
-    if(!thread) throw new Error("No supplier thread exists yet. Send an RFQ first.");
-    await ctx.db.insert("events",{projectId:args.projectId,type:"message_received",payload:{simulator:true,scenario:args.scenario,supplierId:supplier._id},createdAt:Date.now()});
+    const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
+    const supplier=await ctx.runQuery(api.suppliers.listDemoSuppliers,{projectId:args.projectId}).then(xs=>xs.find(x=>x._id===args.supplierId));
+    if(!supplier) throw new Error("Simulator is limited to demo suppliers.");
+    if(!project.inboxId) throw new Error("Project inbox is not ready.");
+    if(!supplier.email) throw new Error("Demo supplier has no inbox address.");
+    const apiKey=process.env.AGENTMAIL_API_KEY; if(!apiKey) throw new Error("AGENTMAIL_API_KEY is not configured.");
+    const baseUrl=process.env.AGENTMAIL_BASE_URL??"https://api.agentmail.to/v0";
+    const lines=await ctx.runQuery(api.lineItems.listLineItems,{projectId:args.projectId});
+    const selected=lines.slice(0,Math.min(lines.length,5));
+    const price=(i:number)=>10000+i*2500;
+    let subject="Quotation — "+project.name, text="";
+    if(args.scenario==="decline"){
+      subject="Unable to quote — "+project.name;
+      text="Thanks for the RFQ. Unfortunately we are unable to supply this order at this time. Please keep us in mind for a future project.";
+    } else {
+      const revised=args.scenario==="revised_price";
+      text="Dear Bidwire,\\n\\nPlease find our "+(revised?"revised ":"")+"quotation:\\n\\n"+selected.map((x,i)=>x.name+" — "+x.quantity+" "+x.unit+" @ "+price(i)*(revised?0.94:1)+" NGN").join("\\n")+"\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier";
+      if(args.scenario==="pdf_quote") subject="Quotation attached — "+project.name;
+    }
+    const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(project.inboxId)+"/messages",{
+      method:"POST",headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
+      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text})
+    });
+    if(!response.ok) throw new Error("AgentMail simulator send failed: "+(await response.text()).slice(0,300));
     return null;
   },
 });
