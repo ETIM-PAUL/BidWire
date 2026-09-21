@@ -9,13 +9,54 @@ function priceExistsInQuoteLines(price: number, realPrices: number[]): boolean {
   return realPrices.some((p) => Math.abs(p - price) < PRICE_TOLERANCE);
 }
 
+// Counter drafts deliberately use currency-prefixed price tokens and no other
+// numbers. That makes the approval guardrail deterministic even after a human
+// edits the draft: every number in the final subject/body must be a price
+// already present in quoteLines.
+function extractNumericTokens(text: string): number[] {
+  const matches = text.match(/(?<![A-Za-z0-9])(?:₦|NGN|USD|\$|EUR|€|GBP|£)?\s*\d[\d,]*(?:\.\d+)?/gi) ?? [];
+  return matches
+    .map((token) => Number(token.replace(/[^\d.]/g, "").replace(/,/g, "")))
+    .filter((value) => Number.isFinite(value));
+}
+
+async function validateCounterDraftPrices(
+  ctx: Parameters<typeof mutation>[0] extends never ? never : any,
+  projectId: any,
+  body: string,
+  citedPrices: number[] | undefined,
+): Promise<string | null> {
+  const quoteLines = await ctx.db
+    .query("quoteLines")
+    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .take(5000);
+  const realPrices = quoteLines.map((l: any) => l.unitPrice);
+  const bodyPrices = extractNumericTokens(body);
+
+  const invalidBodyPrices = bodyPrices.filter((p) => !priceExistsInQuoteLines(p, realPrices));
+  if (invalidBodyPrices.length > 0) {
+    return `Blocked: this draft contains a price (${invalidBodyPrices.join(", ")}) that doesn't match any stored quote.`;
+  }
+
+  if (citedPrices) {
+    const invalidCited = citedPrices.filter((p) => !priceExistsInQuoteLines(p, realPrices));
+    if (invalidCited.length > 0) {
+      return `Blocked: this draft cites a price (${invalidCited.join(", ")}) that doesn't match any stored quote.`;
+    }
+    const missingFromBody = citedPrices.filter(
+      (p) => !bodyPrices.some((bodyPrice) => Math.abs(bodyPrice - p) < PRICE_TOLERANCE),
+    );
+    if (missingFromBody.length > 0) {
+      return `Blocked: the draft's cited price (${missingFromBody.join(", ")}) is not present in the final message.`;
+    }
+  }
+
+  return null;
+}
+
 // Internal: called by negotiateDraft.ts's negotiateWithSupplier action.
 // Guardrail: a negotiation draft may only cite prices that genuinely exist
 // among this project's recorded quote lines (any supplier, any version).
-// Returns a structured ok:false (not a throw) when a cited price doesn't
-// match, so the action can surface a clear explanation instead of a
-// hallucinated number silently becoming a "pending" draft the contractor
-// might approve without noticing.
 export const insertNegotiationDraft = internalMutation({
   args: {
     projectId: v.id("projects"),
@@ -72,30 +113,20 @@ export const sendNegotiationDraft = mutation({
       throw new Error("Draft is not pending");
     }
 
-    // Defense in depth: re-validate at send time too, per the build plan's
-    // explicit "validate ... before allowing approval" wording - catches
-    // the case where the underlying quote data changed since generation.
-    // This re-checks the prices captured at generation time, not a fresh
-    // parse of any manual edits to the draft's text since then.
-    if (draft.citedPrices && draft.citedPrices.length > 0) {
-      const quoteLines = await ctx.db
-        .query("quoteLines")
-        .withIndex("by_project", (q) => q.eq("projectId", draft.projectId))
-        .take(5000);
-      const realPrices = quoteLines.map((l) => l.unitPrice);
-      const invalid = draft.citedPrices.filter((p) => !priceExistsInQuoteLines(p, realPrices));
-      if (invalid.length > 0) {
-        return {
-          ok: false,
-          blockedReason: `Blocked: this draft cites a price (${invalid.join(", ")}) that no longer matches any stored quote.`,
-        };
-      }
+    const validationError = await validateCounterDraftPrices(
+      ctx,
+      draft.projectId,
+      draft.subject + "\n" + draft.body,
+      draft.citedPrices,
+    );
+    if (validationError) {
+      return { ok: false, blockedReason: validationError };
     }
 
     const result = await replyInThread(ctx, {
       projectId: draft.projectId,
       supplierId: draft.supplierId,
-      blockedEventType: "rfq_send_blocked",
+      blockedEventType: "negotiation_send_blocked",
       body: draft.body,
     });
     if (!result.ok) {
