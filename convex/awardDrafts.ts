@@ -2,9 +2,10 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 type AwardLine = {
-  supplierId: string;
+  supplierId: Id<"suppliers">;
   name: string;
   quantity: number;
   unit: string;
