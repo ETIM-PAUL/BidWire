@@ -258,6 +258,39 @@ export const ensureDemoSuppliers = internalMutation({
   },
 });
 
+// Internal: provisionInbox calls this after selecting an AgentMail inbox for the
+// project. In demo mode, every demo supplier gets a controlled AgentMail
+// address, using DEMO_ALLOWLIST when configured and otherwise the shared demo
+// inbox.
+export const assignDemoSupplierEmails = internalMutation({
+  args: { projectId: v.id("projects"), emails: v.array(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const suppliers = await ctx.db
+      .query("suppliers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .take(500);
+    const demoSuppliers = suppliers.filter((supplier) => supplier.source === "demo");
+    if (demoSuppliers.length === 0) return null;
+
+    const configured = (process.env.DEMO_ALLOWLIST ?? "")
+      .split(",")
+      .map((email) => email.trim())
+      .filter(Boolean);
+    const pool = configured.length > 0 ? configured : args.emails;
+    if (pool.length === 0) {
+      throw new Error("No AgentMail inbox is available for demo suppliers.");
+    }
+
+    for (let index = 0; index < demoSuppliers.length; index++) {
+      await ctx.db.patch(demoSuppliers[index]._id, {
+        email: pool[index % pool.length],
+      });
+    }
+    return null;
+  },
+});
+
 export const isDemoAdmin = query({
   args: {}, returns: v.boolean(),
   handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),
