@@ -126,8 +126,8 @@ export function CompareTab({ project }: { project: Doc<'projects'> }) {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-800">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-neutral-800 max-w-full">
+        <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-neutral-800 text-left text-neutral-500">
               <th className="px-3 py-2 font-normal sticky left-0 bg-neutral-950">Item</th>
