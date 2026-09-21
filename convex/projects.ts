@@ -49,7 +49,6 @@ export const createProject = mutation({
       attachmentIds: args.attachmentIds,
       status: "draft",
       createdAt: Date.now(),
-      jobDescriptionCreatedAt: Date.now(),
     });
     await ctx.db.insert("events", {
       projectId,
@@ -117,7 +116,7 @@ export const setInbox = internalMutation({
   },
 });
 
-export const createSampleBathroomProject = mutation({
+export const createSampleBathroomProject = internalMutation({
   args: {},
   returns: v.id("projects"),
   handler: async (ctx) => {
@@ -142,7 +141,7 @@ export const launchSampleJob = action({
   args: {},
   returns: v.id("projects"),
   handler: async (ctx) => {
-    const projectId = await ctx.runMutation(api.projects.createSampleBathroomProject, {});
+    const projectId: v.Infer<typeof v.id("projects")> = await ctx.runMutation(internal.projects.createSampleBathroomProject, {});
     await ctx.runAction(api.boq.generateBoq, { projectId });
     await ctx.runMutation(internal.suppliers.ensureDemoSuppliers, { projectId });
     return projectId;
