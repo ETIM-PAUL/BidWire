@@ -2,6 +2,16 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+
+type AwardLine = {
+  supplierId: Id<"suppliers">;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+};
 
 export const generateAwardDrafts = action({
   args: { projectId: v.id("projects"), awardId: v.id("awards") },
@@ -9,7 +19,7 @@ export const generateAwardDrafts = action({
   handler: async (ctx, args) => {
     const award = await ctx.runQuery(api.awards.getAward, { projectId: args.projectId });
     if (!award) throw new Error("Award not found");
-    const awardLines = await ctx.runQuery(api.awards.getAwardLines, { awardId: args.awardId });
+    const awardLines = (await ctx.runQuery(api.awards.getAwardLines, { awardId: args.awardId })) as AwardLine[];
     const project = await ctx.runQuery(api.projects.getProject, { projectId: args.projectId });
     const suppliers = await ctx.runQuery(api.suppliers.listSuppliers, { projectId: args.projectId });
     const winners = new Set(awardLines.map((r) => r.supplierId as string));
