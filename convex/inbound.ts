@@ -67,18 +67,29 @@ export const onMessageReceived = internalMutation({
       return null;
     }
 
-    const project = await ctx.db
-      .query("projects")
-      .withIndex("by_inbox_id", (q) => q.eq("inboxId", inboxId))
-      .unique();
-    if (!project) {
-      console.error(`onMessageReceived: no project owns inbox ${inboxId}`);
-      return null;
-    }
-
     const providerThreadId = getStringField(args.message, "thread_id");
     const fromAddress = getStringField(args.message, "from")?.trim().toLowerCase();
     const subject = getStringField(args.message, "subject") ?? "";
+
+    // Demo mode may reuse one AgentMail inbox across multiple projects.
+    // Outbound RFQs carry a project token so inbound replies can be routed
+    // deterministically without requiring another AgentMail inbox.
+    const projectToken = subject.match(/\[BidWire:([^\]]+)\]/)?.[1];
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_inbox_id", (q) => q.eq("inboxId", inboxId))
+      .take(500);
+    const project = projectToken
+      ? projects.find((candidate) => candidate._id === projectToken)
+      : projects.length === 1
+        ? projects[0]
+        : undefined;
+    if (!project) {
+      console.error(
+        `onMessageReceived: could not route inbox ${inboxId} message; subject=${subject}`,
+      );
+      return null;
+    }
     const bodyText =
       getStringField(args.message, "text") ?? getStringField(args.message, "html") ?? "";
     const timestampStr = getStringField(args.message, "timestamp");
