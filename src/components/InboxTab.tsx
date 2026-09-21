@@ -46,8 +46,8 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
   return (
     <div className="space-y-4">
       <NeedsReviewStrip project={project} />
-      <div className="grid grid-cols-[280px_1fr] gap-4">
-      <div className="space-y-1">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
+      <div className="space-y-1 min-w-0">
         <h3 className="text-sm font-medium text-neutral-300 mb-2">Threads</h3>
         {threads === undefined && <p className="text-sm text-neutral-500">Loading…</p>}
         {threads?.length === 0 && (
@@ -90,7 +90,7 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
         )}
       </div>
 
-      <div className="rounded-lg border border-neutral-800 p-4 min-h-[200px]">
+      <div className="rounded-lg border border-neutral-800 p-3 sm:p-4 min-h-[200px] min-w-0">
         {selection === null && (
           <p className="text-sm text-neutral-500">Select a thread to view messages.</p>
         )}
@@ -110,7 +110,7 @@ export function InboxTab({ project }: { project: Doc<'projects'> }) {
                   <span>{new Date(m.receivedAt).toLocaleString()}</span>
                 </div>
                 <p className="text-sm font-medium mt-1">{m.subject}</p>
-                <p className="text-sm text-neutral-400 whitespace-pre-wrap mt-1">{m.bodyText}</p>
+                <p className="text-sm text-neutral-400 whitespace-pre-wrap mt-1 break-words">{m.bodyText}</p>
                 {m.attachmentIds.length > 0 && (
                   <p className="text-xs text-neutral-500 mt-2">
                     {m.attachmentIds.length} attachment{m.attachmentIds.length > 1 ? 's' : ''}
