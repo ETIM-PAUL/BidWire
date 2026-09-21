@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api, internal } from "./_generated/api";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
 
 const projectStatus = v.union(
@@ -47,7 +48,8 @@ export const createProject = mutation({
       currency: args.currency,
       attachmentIds: args.attachmentIds,
       status: "draft",
-      createdAt: Date.now(),\n      jobDescriptionCreatedAt: Date.now(),
+      createdAt: Date.now(),
+      jobDescriptionCreatedAt: Date.now(),
     });
     await ctx.db.insert("events", {
       projectId,
