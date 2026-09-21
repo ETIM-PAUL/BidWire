@@ -193,9 +193,9 @@ export const simulatorReplies = action({
       text="Dear Bidwire,\\n\\nPlease find our "+(revised?"revised ":"")+"quotation:\\n\\n"+selected.map((x,i)=>x.name+" — "+x.quantity+" "+x.unit+" @ "+price(i)*(revised?0.94:1)+" NGN").join("\\n")+"\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier";
       if(args.scenario==="pdf_quote") subject="Quotation attached — "+project.name;
     }
-    const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(project.inboxId)+"/messages",{
+    const response=await fetch(baseUrl+"/inboxes/"+encodeURIComponent(supplier.email)+"/messages",{
       method:"POST",headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
-      body:JSON.stringify({to:project.inboxAddress,from:supplier.email,subject,text,...(args.scenario==="pdf_quote"?{attachments:[{content:demoPdfBase64("Demo supplier quotation"),filename:"quote.pdf",content_type:"application/pdf"}]}:{})})
+      body:JSON.stringify({to:project.inboxAddress,subject,text,...(args.scenario==="pdf_quote"?{attachments:[{content:demoPdfBase64("Demo supplier quotation"),filename:"quote.pdf",content_type:"application/pdf"}]}:{})})
     });
     if(!response.ok) throw new Error("AgentMail simulator send failed: "+(await response.text()).slice(0,300));
     return null;
