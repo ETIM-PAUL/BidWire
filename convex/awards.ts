@@ -78,5 +78,35 @@ export const getAward = query({
 export const insertAwardDraft = internalMutation({
   args:{projectId:v.id("projects"),supplierId:v.id("suppliers"),awardId:v.id("awards"),kind:v.union(v.literal("award"),v.literal("decline")),subject:v.string(),body:v.string()},
   returns:v.null(),
-  handler:async(ctx,args)=>{await ctx.db.insert("drafts",{projectId:args.projectId,supplierId:args.supplierId,kind:args.kind,subject:args.subject,body:args.body,status:"pending"});return null;}
+  handler:async(ctx,args)=>{await ctx.db.insert("drafts",{projectId:args.projectId,supplierId:args.supplierId,kind:args.kind,subject:args.subject,body:args.body,status:"pending",attachmentId:args.attachmentId});return null;}
+});
+
+export const sendAwardDraft = mutation({
+  args:{draftId:v.id("drafts")},
+  returns:v.object({ok:v.boolean(),blockedReason:v.optional(v.string())}),
+  handler:async(ctx,args)=>{
+    const draft=await ctx.db.get(args.draftId); if(!draft) throw new Error("Draft not found");
+    await requireProjectOwner(ctx,draft.projectId);
+    if(draft.status!=="pending" || (draft.kind!=="award" && draft.kind!=="decline")) throw new Error("Draft is not sendable");
+    const supplier=await ctx.db.get(draft.supplierId); const project=await ctx.db.get(draft.projectId);
+    if(!supplier?.email || !project?.inboxId) throw new Error("Supplier email or project inbox is missing");
+    if(process.env.DEMO_MODE==="true"){
+      const allow=(process.env.DEMO_ALLOWLIST??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+      if(!allow.includes(supplier.email.toLowerCase())){
+        const reason=`DEMO_MODE is on: ${supplier.email} is not on the allowlist. Refusing to send.`;
+        await ctx.db.insert("events",{projectId:draft.projectId,type:"award_send_blocked",payload:{supplierId:draft.supplierId,email:supplier.email,reason},createdAt:Date.now()});
+        return {ok:false,blockedReason:reason};
+      }
+    }
+    const msg:any={to:supplier.email,subject:draft.subject,text:draft.body};
+    if(draft.attachmentId){
+      const blob=await ctx.storage.get(draft.attachmentId);
+      if(blob){ const bytes=new Uint8Array(await blob.arrayBuffer()); let bin=""; for(const b of bytes) bin+=String.fromCharCode(b); msg.attachments=[{content:btoa(bin),filename:"purchase-order.html",content_type:"text/html"}]; }
+    }
+    const outboundId=await agentmail.sendMessage(ctx,project.inboxId,msg);
+    await ctx.db.patch(args.draftId,{status:"sent"});
+    await ctx.db.insert("messages",{projectId:draft.projectId,supplierId:draft.supplierId,providerMessageId:outboundId,direction:"out",subject:draft.subject,bodyText:draft.body,attachmentIds:draft.attachmentId?[draft.attachmentId]:[],receivedAt:Date.now(),processed:true});
+    await ctx.db.insert("events",{projectId:draft.projectId,type:draft.kind==="award"?"po_sent":"decline_sent",payload:{supplierId:draft.supplierId},createdAt:Date.now()});
+    return {ok:true};
+  }
 });
