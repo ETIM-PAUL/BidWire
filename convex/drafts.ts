@@ -31,6 +31,7 @@ const draftFields = {
   subject: v.string(),
   body: v.string(),
   status: draftStatus,
+  citedPrices: v.optional(v.array(v.number())),
 };
 
 export const listDrafts = query({
