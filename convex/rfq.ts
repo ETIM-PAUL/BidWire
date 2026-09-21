@@ -57,19 +57,19 @@ export const draftRfqs = action({
       projectId: args.projectId,
     });
 
-    const selectedSuppliers = suppliers.filter((s) => s.status === "selected");
+    const selectedSuppliers = suppliers.filter((s: (typeof suppliers)[number]) => s.status === "selected");
     const deadline = replyByDate();
 
     for (const supplier of selectedSuppliers) {
       const alreadyDrafted = existingDrafts.some(
-        (d) => d.supplierId === supplier._id && d.kind === "rfq",
+        (d: (typeof existingDrafts)[number]) => d.supplierId === supplier._id && d.kind === "rfq",
       );
       if (alreadyDrafted) {
         continue;
       }
 
       const supplierCategories = new Set(supplier.categories.map(normalizeCategory));
-      const matchedItems = lineItems.filter((item) =>
+      const matchedItems = lineItems.filter((item: (typeof lineItems)[number]) =>
         supplierCategories.has(normalizeCategory(item.category)),
       );
       if (matchedItems.length === 0) {
@@ -77,7 +77,7 @@ export const draftRfqs = action({
       }
 
       const itemsList = matchedItems
-        .map((item) => `- ${item.quantity} ${item.unit}: ${item.name} (${item.spec})`)
+        .map((item: (typeof matchedItems)[number]) => `- ${item.quantity} ${item.unit}: ${item.name} (${item.spec})`)
         .join("\n");
 
       const draft = await structuredCall<RfqDraft>({
