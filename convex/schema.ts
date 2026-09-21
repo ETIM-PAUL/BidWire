@@ -25,6 +25,8 @@ export default defineSchema({
     attachmentIds: v.optional(v.array(v.id("_storage"))),
     autoApproveFollowUps: v.optional(v.boolean()),
     createdAt: v.number(),
+    awardId: v.optional(v.id("awards")),
+    awardedAt: v.optional(v.number()),
   })
     .index("by_owner", ["ownerId"])
     .index("by_inbox_id", ["inboxId"]),
@@ -161,6 +163,28 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_supplier", ["supplierId"]),
+
+  awards: defineTable({
+    projectId: v.id("projects"),
+    mode: v.union(v.literal("single"), v.literal("split")),
+    deliveryAddress: v.string(),
+    deliveryDate: v.string(),
+    totalSpend: v.number(),
+    highestQuote: v.number(),
+    publishedListTotal: v.number(),
+    awardedAt: v.number(),
+  }).index("by_project", ["projectId"]),
+
+  awardLines: defineTable({
+    awardId: v.id("awards"),
+    projectId: v.id("projects"),
+    supplierId: v.id("suppliers"),
+    lineItemId: v.id("lineItems"),
+    quantity: v.number(),
+    unit: v.string(),
+    unitPrice: v.number(),
+    total: v.number(),
+  }).index("by_award", ["awardId"]),
 
   events: defineTable({
     projectId: v.id("projects"),
