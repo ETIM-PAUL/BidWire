@@ -9,6 +9,7 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
   const award=useMutation(api.awards.awardProject)
   const generate=useAction(api.awardDrafts.generateAwardDrafts)
   const send=useMutation(api.awards.sendAwardDraft)
+  const updateDraft=useMutation(api.drafts.updateDraft)
   const [mode,setMode]=useState<'single'|'split'>('single')
   const [supplierId,setSupplierId]=useState<Id<'suppliers'>|''>('')
   const [address,setAddress]=useState(project.location)
@@ -56,6 +57,6 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
     </div>
     <button disabled={busy} onClick={()=>void confirmAward()} className="rounded-md bg-neutral-100 text-neutral-900 px-4 py-2 text-sm font-medium disabled:opacity-50">{busy?'Preparing…':'Confirm award & create drafts'}</button>
     {error&&<p className="text-sm text-red-400">{error}</p>}
-    {pending.length>0&&<div className="space-y-3"><h3 className="text-sm font-medium">Approval queue ({pending.length})</h3>{pending.map(d=><div key={d._id} className="border border-neutral-800 rounded p-3"><div className="flex justify-between gap-3"><div><p className="text-sm font-medium">{d.kind==='award'?'Purchase order':'Decline'}</p><p className="text-xs text-neutral-500">{d.subject}</p></div><button onClick={()=>void send({draftId:d._id})} className="text-xs bg-neutral-100 text-neutral-900 rounded px-2 py-1">Approve & send</button></div><textarea defaultValue={d.body} onBlur={e=>void useMutation} rows={5} className="mt-2 w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-sm"/></div>)}</div>}
+    {pending.length>0&&<div className="space-y-3"><h3 className="text-sm font-medium">Approval queue ({pending.length})</h3>{pending.map(d=><div key={d._id} className="border border-neutral-800 rounded p-3"><div className="flex justify-between gap-3"><div><p className="text-sm font-medium">{d.kind==='award'?'Purchase order':'Decline'}</p><p className="text-xs text-neutral-500">{d.subject}</p></div><button onClick={()=>void send({draftId:d._id})} className="text-xs bg-neutral-100 text-neutral-900 rounded px-2 py-1">Approve & send</button></div><textarea defaultValue={d.body} onBlur={e=>void updateDraft({draftId:d._id,body:e.currentTarget.value})} rows={5} className="mt-2 w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-sm"/></div>)}</div>}
   </div>
 }
