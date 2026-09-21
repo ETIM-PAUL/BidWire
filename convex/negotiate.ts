@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { requireProjectOwner } from "./lib/auth";
 import { replyInThread } from "./lib/threadReply";
 
@@ -21,16 +23,16 @@ function extractNumericTokens(text: string): number[] {
 }
 
 async function validateCounterDraftPrices(
-  ctx: Parameters<typeof mutation>[0] extends never ? never : any,
-  projectId: any,
+  ctx: MutationCtx,
+  projectId: Id<"projects">,
   body: string,
   citedPrices: number[] | undefined,
 ): Promise<string | null> {
   const quoteLines = await ctx.db
     .query("quoteLines")
-    .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
     .take(5000);
-  const realPrices = quoteLines.map((l: any) => l.unitPrice);
+  const realPrices = quoteLines.map((l) => l.unitPrice);
   const bodyPrices = extractNumericTokens(body);
 
   const invalidBodyPrices = bodyPrices.filter((p) => !priceExistsInQuoteLines(p, realPrices));
