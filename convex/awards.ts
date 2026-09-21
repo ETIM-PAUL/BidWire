@@ -49,7 +49,7 @@ export const getAwardPreview = query({
 });
 
 export const awardProject = mutation({
-  args:{projectId:v.id("projects"),mode:v.union(v.literal("single"),v.literal("split")),supplierId:v.optional(v.id("suppliers")),deliveryAddress:v.string(),deliveryDate:v.string()},
+  args:{projectId:v.id("projects"),mode:v.union(v.literal("single"),v.literal("split")),supplierId:v.optional(v.id("suppliers")),deliveryAddress:v.string(),deliveryDate:v.string(),quantities:v.array(v.object({lineItemId:v.id("lineItems"),quantity:v.number()}))},
   returns:v.id("awards"),
   handler:async(ctx,args)=>{
     await requireProjectOwner(ctx,args.projectId);
@@ -62,8 +62,10 @@ export const awardProject = mutation({
         ? candidates.find(x=>x.supplierId===args.supplierId)
         : candidates[0];
       if(!best) throw new Error(`No quote for ${item.name} from the selected supplier`);
-      const lineTotal=best.unitPrice*item.quantity; total+=lineTotal;
-      await ctx.db.insert("awardLines",{awardId,projectId:args.projectId,supplierId:best.supplierId,lineItemId:item._id,quantity:item.quantity,unit:item.unit,unitPrice:best.unitPrice,total:lineTotal});
+      const confirmedQuantity=args.quantities.find(q=>q.lineItemId===item._id)?.quantity ?? item.quantity;
+      if(!Number.isFinite(confirmedQuantity) || confirmedQuantity < 0) throw new Error(`Invalid quantity for ${item.name}`);
+      const lineTotal=best.unitPrice*confirmedQuantity; total+=lineTotal;
+      await ctx.db.insert("awardLines",{awardId,projectId:args.projectId,supplierId:best.supplierId,lineItemId:item._id,quantity:confirmedQuantity,unit:item.unit,unitPrice:best.unitPrice,total:lineTotal});
     }
     const winningSuppliers=new Set<string>();
     for(const line of await ctx.db.query("awardLines").withIndex("by_award",q=>q.eq("awardId",awardId)).take(5000)) winningSuppliers.add(line.supplierId as string);
