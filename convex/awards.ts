@@ -49,7 +49,7 @@ export const getAwardPreview = query({
 });
 
 export const awardProject = mutation({
-  args:{projectId:v.id("projects"),mode:v.union(v.literal("single"),v.literal("split")),deliveryAddress:v.string(),deliveryDate:v.string()},
+  args:{projectId:v.id("projects"),mode:v.union(v.literal("single"),v.literal("split")),supplierId:v.optional(v.id("suppliers")),deliveryAddress:v.string(),deliveryDate:v.string()},
   returns:v.id("awards"),
   handler:async(ctx,args)=>{
     await requireProjectOwner(ctx,args.projectId);
@@ -58,10 +58,16 @@ export const awardProject = mutation({
     let total=0;
     for(const item of preview.items){
       const candidates=preview.lines.filter(l=>l.lineItemId===item._id && preview.latest.get(l.supplierId as string)?._id===l.quoteId).sort((a,b)=>a.unitPrice-b.unitPrice);
-      const best=candidates[0]; if(!best) continue;
+      const best=args.mode==="single"
+        ? candidates.find(x=>x.supplierId===args.supplierId)
+        : candidates[0];
+      if(!best) throw new Error(`No quote for ${item.name} from the selected supplier`);
       const lineTotal=best.unitPrice*item.quantity; total+=lineTotal;
       await ctx.db.insert("awardLines",{awardId,projectId:args.projectId,supplierId:best.supplierId,lineItemId:item._id,quantity:item.quantity,unit:item.unit,unitPrice:best.unitPrice,total:lineTotal});
     }
+    const winningSuppliers=new Set<string>();
+    for(const line of await ctx.db.query("awardLines").withIndex("by_award",q=>q.eq("awardId",awardId)).take(5000)) winningSuppliers.add(line.supplierId as string);
+    for(const supplierId of winningSuppliers) total += preview.latest.get(supplierId)?.deliveryCost ?? 0;
     await ctx.db.patch(awardId,{totalSpend:total});
     await ctx.db.patch(args.projectId,{status:"awarded",awardId,awardedAt:Date.now()});
     await ctx.db.insert("events",{projectId:args.projectId,type:"project_awarded",payload:{awardId,mode:args.mode,totalSpend:total},createdAt:Date.now()});
