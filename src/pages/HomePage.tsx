@@ -7,7 +7,7 @@ import type { Id } from '../../convex/_generated/dataModel'
 import { SignOutButton } from '../components/SignOutButton'
 
 export function HomePage() {
-  const projects = useQuery(api.projects.listMyProjects)
+  const projects = useQuery(api.projects.listMyProjects)\n  const isDemoAdmin = useQuery(api.suppliers.isDemoAdmin)
   const createProject = useMutation(api.projects.createProject)
   const launchSample = useAction(api.projects.launchSampleJob)
   const [sampleBusy, setSampleBusy] = useState(false)
@@ -52,7 +52,7 @@ export function HomePage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Bidwire</h1>
-        <SignOutButton />
+        <div className="flex items-center gap-3">{isDemoAdmin && <Link to="/admin/simulator" className="text-xs text-neutral-400 hover:text-neutral-200">Supplier simulator</Link>}<SignOutButton /></div>
       </header>
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
         {error && <div role="alert" className="rounded-md border border-red-900 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</div>}\n\n        <div className="flex items-center justify-between">
