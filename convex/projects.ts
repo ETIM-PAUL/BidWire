@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
+import type { Id } from "./_generated/dataModel";
 
 const projectStatus = v.union(
   v.literal("draft"),
@@ -141,7 +142,7 @@ export const launchSampleJob = action({
   args: {},
   returns: v.id("projects"),
   handler: async (ctx) => {
-    const projectId: v.Infer<typeof v.id("projects")> = await ctx.runMutation(internal.projects.createSampleBathroomProject, {});
+    const projectId: Id<"projects"> = await ctx.runMutation(internal.projects.createSampleBathroomProject, {});
     await ctx.runAction(api.boq.generateBoq, { projectId });
     await ctx.runMutation(internal.suppliers.ensureDemoSuppliers, { projectId });
     return projectId;
