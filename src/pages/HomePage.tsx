@@ -14,13 +14,13 @@ export function HomePage() {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [files, setFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<File[]>([])\n  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = e.currentTarget
     const formData = new FormData(form)
-    setSubmitting(true)
+    setError(null)\n    setSubmitting(true)
     try {
       const attachmentIds: Id<'_storage'>[] = []
       for (const file of files) {
@@ -48,14 +48,14 @@ export function HomePage() {
     }
   }
 
-  async function handleSample() {\n    setSampleBusy(true)\n    try {\n      const id = await launchSample()\n      window.location.href = `/p/${id}`\n    } finally { setSampleBusy(false) }\n  }\n\n  return (
+  async function handleSample() {\n    setSampleBusy(true)\n    setError(null)\n    try {\n      const id = await launchSample()\n      window.location.href = `/p/${id}`\n    } catch (e) { setError(e instanceof Error ? e.message : 'Could not create sample job.') } finally { setSampleBusy(false) }\n  }\n\n  return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Bidwire</h1>
         <SignOutButton />
       </header>
       <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
-        <div className="flex items-center justify-between">
+        {error && <div role="alert" className="rounded-md border border-red-900 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</div>}\n\n        <div className="flex items-center justify-between">
           <h2 className="text-xl font-medium">Projects</h2>
           <button
             onClick={() => setShowForm((v) => !v)}
