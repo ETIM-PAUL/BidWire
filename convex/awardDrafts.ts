@@ -9,13 +9,13 @@ export const generateAwardDrafts = action({
   handler: async (ctx, args) => {
     const award = await ctx.runQuery(api.awards.getAward, { projectId: args.projectId });
     if (!award) throw new Error("Award not found");
-    const preview = await ctx.runQuery(api.awards.getAwardPreview, { projectId: args.projectId });
+    const awardLines = await ctx.runQuery(api.awards.getAwardLines, { awardId: args.awardId });
     const project = await ctx.runQuery(api.projects.getProject, { projectId: args.projectId });
     const suppliers = await ctx.runQuery(api.suppliers.listSuppliers, { projectId: args.projectId });
-    const winners = new Set(preview.suppliers.map((s) => s.supplierId as string));
+    const winners = new Set(awardLines.map((r) => r.supplierId as string));
     for (const supplier of suppliers) {
       const isWinner = winners.has(supplier._id as string);
-      const rows = preview.rows.filter((r) => r.supplierId === supplier._id);
+      const rows = awardLines.filter((r) => r.supplierId === supplier._id);
       const subject = isWinner ? "Purchase order — " + rows.length + " item(s)" : "Thank you for your quotation";
       const body = isWinner
         ? "Dear " + supplier.name + ",\n\nPlease find our purchase order for the following items:\n\n" +
