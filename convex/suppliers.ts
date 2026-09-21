@@ -199,3 +199,12 @@ export const ensureDemoSuppliers = internalMutation({
     return null;
   },
 });
+
+export const listDemoSuppliers = query({
+  args: { projectId: v.id("projects") },
+  returns: v.array(v.object(supplierFields)),
+  handler: async (ctx,args) => {
+    await requireProjectOwner(ctx,args.projectId);
+    return (await ctx.db.query("suppliers").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(500)).filter(s=>s.source==="demo");
+  },
+});
