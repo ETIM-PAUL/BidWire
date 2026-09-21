@@ -114,3 +114,24 @@ export const setInbox = internalMutation({
     return null;
   },
 });
+
+export const createSampleBathroomProject = mutation({
+  args: {},
+  returns: v.id("projects"),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const existing = await ctx.db.query("projects").withIndex("by_owner", q => q.eq("ownerId", userId)).take(50);
+    const now = Date.now();
+    const projectId = await ctx.db.insert("projects", {
+      ownerId: userId,
+      name: "Sample Bathroom Renovation",
+      jobDescription: "Full bathroom renovation: replace floor and wall tiles, install a close-coupled toilet, vanity basin, shower mixer and screen, new floor drain, plumbing fittings, waterproofing and repainting. Mid-range finish for a typical residential bathroom.",
+      location: "Port Harcourt",
+      currency: "NGN",
+      status: "draft",
+      createdAt: now,
+    });
+    await ctx.db.insert("events", { projectId, type: "project_created", payload: { name: "Sample Bathroom Renovation", sample: true }, createdAt: now });
+    return projectId;
+  },
+});
