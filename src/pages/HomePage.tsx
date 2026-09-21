@@ -9,6 +9,8 @@ import { SignOutButton } from '../components/SignOutButton'
 export function HomePage() {
   const projects = useQuery(api.projects.listMyProjects)
   const createProject = useMutation(api.projects.createProject)
+  const createSample = useMutation(api.projects.createSampleBathroomProject)
+  const [sampleBusy, setSampleBusy] = useState(false)
   const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -46,7 +48,7 @@ export function HomePage() {
     }
   }
 
-  return (
+  async function handleSample() {\n    setSampleBusy(true)\n    try {\n      const id = await createSample()\n      window.location.href = `/p/${id}`\n    } finally { setSampleBusy(false) }\n  }\n\n  return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Bidwire</h1>
@@ -57,7 +59,7 @@ export function HomePage() {
           <h2 className="text-xl font-medium">Projects</h2>
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium"
+            className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium hover:bg-white"
           >
             {showForm ? 'Cancel' : 'New project'}
           </button>
