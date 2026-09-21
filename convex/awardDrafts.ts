@@ -5,6 +5,7 @@ import { api, components, internal } from "./_generated/api";
 import { AgentMail } from "@agentmail/convex";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 const agentmail=new AgentMail(components.agentmail);
+const currencyFor=async(ctx:any,projectId:any)=> (await ctx.runQuery(api.projects.getProject,{projectId})).currency;
 
 export const generateAwardDrafts=action({
  args:{projectId:v.id("projects"),awardId:v.id("awards")},
@@ -20,7 +21,7 @@ export const generateAwardDrafts=action({
      const rows=preview.rows.filter(r=>r.supplierId===s._id);
      const subject=isWinner?`Purchase order — ${rows.length} item(s)`:"Thank you for your quotation";
      const body=isWinner
-       ? `Dear ${s.name},\\n\\nPlease find our purchase order for the following items:\\n\\n${rows.map(r=>`• ${r.name}: ${r.quantity} ${r.unit} @ ${r.unitPrice.toLocaleString()} ${(await ctx.runQuery(api.projects.getProject,{projectId:args.projectId})).currency}`).join("\\n")}\\n\\nDelivery address: ${award.deliveryAddress}\\nRequested delivery date: ${award.deliveryDate}\\n\\nPlease confirm receipt and expected delivery.\\n\\nThank you.`
+       ? `Dear ${s.name},\\n\\nPlease find our purchase order for the following items:\\n\\n${rows.map(r=>`• ${r.name}: ${r.quantity} ${r.unit} @ ${r.unitPrice.toLocaleString()} ${await currencyFor(ctx,args.projectId)}`).join("\\n")}\\n\\nDelivery address: ${award.deliveryAddress}\\nRequested delivery date: ${award.deliveryDate}\\n\\nPlease confirm receipt and expected delivery.\\n\\nThank you.`
        : `Dear ${s.name},\\n\\nThank you for taking the time to quote for this project. We have proceeded with another supplier for this order. We appreciate your quotation and hope to work with you on a future opportunity.\\n\\nKind regards.`;
      await ctx.runMutation(internal.awards.insertAwardDraft,{projectId:args.projectId,supplierId:s._id,awardId:args.awardId,kind:isWinner?"award":"decline",subject,body});
    }
