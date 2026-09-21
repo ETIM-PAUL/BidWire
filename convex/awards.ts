@@ -74,3 +74,9 @@ export const getAward = query({
   returns:v.union(v.object({awardId:v.id("awards"),mode:v.union(v.literal("single"),v.literal("split")),deliveryAddress:v.string(),deliveryDate:v.string(),totalSpend:v.number(),highestQuote:v.number(),publishedListTotal:v.number(),awardedAt:v.number()}),v.null()),
   handler:async(ctx,args)=>{await requireProjectOwner(ctx,args.projectId);const a=await ctx.db.query("awards").withIndex("by_project",q=>q.eq("projectId",args.projectId)).order("desc").first();return a?{awardId:a._id,mode:a.mode,deliveryAddress:a.deliveryAddress,deliveryDate:a.deliveryDate,totalSpend:a.totalSpend,highestQuote:a.highestQuote,publishedListTotal:a.publishedListTotal,awardedAt:a.awardedAt}:null}
 });
+
+export const insertAwardDraft = internalMutation({
+  args:{projectId:v.id("projects"),supplierId:v.id("suppliers"),awardId:v.id("awards"),kind:v.union(v.literal("award"),v.literal("decline")),subject:v.string(),body:v.string()},
+  returns:v.null(),
+  handler:async(ctx,args)=>{await ctx.db.insert("drafts",{projectId:args.projectId,supplierId:args.supplierId,kind:args.kind,subject:args.subject,body:args.body,status:"pending"});return null;}
+});
