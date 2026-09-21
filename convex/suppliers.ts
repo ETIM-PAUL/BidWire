@@ -1,8 +1,13 @@
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";\nimport { api } from "./_generated/api";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { api } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 
-function isDemoAdmin(identity: { email?: string | null } | null): boolean {\n  const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);\n  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}\n\nfunction demoPdfBase64(text: string): string {
+function isDemoAdmin(identity: { email?: string | null } | null): boolean {
+    const allowed=(process.env.DEMO_ADMIN_EMAILS??"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+  return process.env.DEMO_MODE === "true" && !!identity?.email && allowed.includes(identity.email.toLowerCase());\n}
+
+function demoPdfBase64(text: string): string {
   const esc=text.replace(/([\\()])/g,"\\$1");
   const objects=[
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -174,7 +179,9 @@ export const simulatorReplies = action({
   args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("pdf_quote"), v.literal("decline"), v.literal("revised_price")) },
   returns: v.null(),
   handler: async (ctx,args) => {
-    const identity=await ctx.auth.getUserIdentity();\n    if(!isDemoAdmin(identity)) throw new Error("Demo simulator is admin-only.");\n    const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
+    const identity=await ctx.auth.getUserIdentity();
+    if(!isDemoAdmin(identity)) throw new Error("Demo simulator is admin-only.");
+    const project=await ctx.runQuery(api.projects.getProject,{projectId:args.projectId});
     const supplier=await ctx.runQuery(api.suppliers.listDemoSuppliers,{projectId:args.projectId}).then(xs=>xs.find(x=>x._id===args.supplierId));
     if(!supplier) throw new Error("Simulator is limited to demo suppliers.");
     if(!project.inboxId) throw new Error("Project inbox is not ready.");
@@ -250,7 +257,10 @@ export const ensureDemoSuppliers = internalMutation({
   },
 });
 
-export const isDemoAdmin = query({\n  args: {}, returns: v.boolean(),\n  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),\n});\n\nexport const listDemoSuppliers = query({
+export const isDemoAdmin = query({\n  args: {}, returns: v.boolean(),
+  handler: async (ctx) => isDemoAdmin(await ctx.auth.getUserIdentity()),\n});
+
+export const listDemoSuppliers = query({
   args: { projectId: v.id("projects") },
   returns: v.array(v.object(supplierFields)),
   handler: async (ctx,args) => {
