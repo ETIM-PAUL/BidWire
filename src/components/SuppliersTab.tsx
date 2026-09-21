@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { FollowUpDrafts } from './FollowUpDrafts'
+import { NegotiationDrafts, NegotiateButton } from './NegotiationDrafts'
 import { RfqDrafts } from './RfqDrafts'
 
 const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = {
@@ -120,6 +121,9 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
                     ))}
                   </div>
                 )}
+                {s.status === 'replied' && (
+                  <NegotiateButton projectId={project._id} supplierId={s._id} />
+                )}
                 <label
                   className={`flex items-center gap-2 pt-2 text-xs ${
                     locked ? 'text-neutral-600' : 'text-neutral-300 cursor-pointer'
@@ -143,6 +147,7 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
 
       <RfqDrafts project={project} />
       <FollowUpDrafts project={project} />
+      <NegotiationDrafts project={project} />
     </div>
   )
 }
