@@ -6,6 +6,15 @@ import { requireProjectOwner } from "./lib/auth";
 
 const agentmail = new AgentMail(components.agentmail);
 
+function hintMatchesLineItem(itemHint: string, lineItemName: string): boolean {
+  const nameWords = new Set(lineItemName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const hintWords = new Set(itemHint.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  if (nameWords.size === 0) return false;
+  let overlap = 0;
+  for (const word of nameWords) if (hintWords.has(word)) overlap++;
+  return overlap / nameWords.size >= 0.5;
+}
+
 export const getAwardPreview = query({
   args: { projectId: v.id("projects") },
   returns: v.object({
@@ -41,7 +50,7 @@ export const getAwardPreview = query({
     }).sort((a,b)=>b-a)[0] ?? 0;
     const published = result.reduce((sum,r)=>{
       const s=suppliers.find(x=>x._id===r.supplierId);
-      const lp=(s?.listPrices??[]).find(x=>x.itemHint.toLowerCase().includes(r.name.toLowerCase()) || r.name.toLowerCase().includes(x.itemHint.toLowerCase()));
+      const lp=(s?.listPrices??[]).find(x=>hintMatchesLineItem(x.itemHint, r.name));
       return sum+(lp?.price??0)*r.quantity;
     },0);
     return {rows:result,suppliers:[...supplierTotals].map(([supplierId,total])=>({supplierId:supplierId as any,supplierName:names.get(supplierId)??"Supplier",total})),totalSpend:result.reduce((n,r)=>n+r.total,0),highestQuote:highest,publishedListTotal:published};
@@ -57,7 +66,7 @@ export const awardProject = mutation({
     const suppliers=await ctx.db.query("suppliers").withIndex("by_project",q=>q.eq("projectId",args.projectId)).take(500);
     const highestQuote=[...preview.latest.values()].map(q=>preview.lines.filter(l=>l.quoteId===q._id).reduce((n,l)=>n+l.total,0)+(q.deliveryCost??0)).sort((a,b)=>b-a)[0]??0;
     const publishedListTotal=preview.items.reduce((sum,item)=>{
-      const matches=suppliers.flatMap(s=>(s.listPrices??[]).filter(lp=>lp.itemHint.toLowerCase().includes(item.name.toLowerCase())||item.name.toLowerCase().includes(lp.itemHint.toLowerCase())));
+      const matches=suppliers.flatMap(s=>(s.listPrices??[]).filter(lp=>hintMatchesLineItem(lp.itemHint, item.name)));
       const price=matches.sort((a,b)=>a.price-b.price)[0]?.price;
       return sum+(price??0)*item.quantity;
     },0);
