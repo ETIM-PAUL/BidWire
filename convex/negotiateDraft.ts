@@ -42,7 +42,7 @@ export const negotiateWithSupplier = action({
     const suppliers = await ctx.runQuery(api.suppliers.listSuppliers, {
       projectId: args.projectId,
     });
-    const supplier = suppliers.find((s) => s._id === args.supplierId);
+    const supplier = suppliers.find((s: (typeof suppliers)[number]) => s._id === args.supplierId);
     if (!supplier) {
       return { ok: false as const, reason: "Supplier not found" };
     }
@@ -67,7 +67,7 @@ export const negotiateWithSupplier = action({
       if (targetLineItemIds && !targetLineItemIds.has(row.lineItemId as string)) {
         continue;
       }
-      const theirCell = row.cells.find((c) => c.supplierId === args.supplierId);
+      const theirCell = row.cells.find((c: (typeof row.cells)[number]) => c.supplierId === args.supplierId);
       if (!theirCell || row.bestPrice === undefined || row.bestSupplierId === undefined) {
         continue;
       }
@@ -81,7 +81,7 @@ export const negotiateWithSupplier = action({
         theirPrice: theirCell.unitPrice,
         competingPrice: row.bestPrice,
         competingSupplierName: args.nameCompetitor
-          ? matrix.columns.find((c) => c.supplierId === row.bestSupplierId)?.supplierName
+          ? matrix.columns.find((c: (typeof matrix.columns)[number]) => c.supplierId === row.bestSupplierId)?.supplierName
           : undefined,
       });
     }

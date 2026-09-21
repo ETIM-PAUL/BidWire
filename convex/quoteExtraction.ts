@@ -189,7 +189,7 @@ export const processInboundMessage = internalAction({
       });
       const candidates = lineItems
         .map(
-          (li) =>
+          (li: (typeof lineItems)[number]) =>
             `- id=${li._id} | ${li.name} | ${li.spec} | ${li.quantity} ${li.unit} | ${li.category}`,
         )
         .join("\n");
