@@ -3,6 +3,7 @@ import { action, internalMutation, internalQuery, mutation, query } from "./_gen
 import { api, components } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import type { Doc } from "./_generated/dataModel";
 
 function isDemoAdmin(identity: { email?: string | null } | null): boolean {
   const allowed = (process.env.DEMO_ADMIN_EMAILS ?? "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
@@ -78,16 +79,19 @@ export const insertDiscoveredSupplier = internalMutation({
 
 function extractDomain(url: string): string { try { return new URL(url).hostname.replace(/^www\\./, ""); } catch { return url; } }
 
-async function getOwnedSupplier(ctx: any, supplierId: any) {
-  const project = await ctx.runQuery(api.suppliers.getSupplierProjectId, { supplierId });
+type Supplier = Doc<"suppliers">;
+type ProjectRef = { projectId: Doc<"projects">["_id"] } | null;
+
+async function getOwnedSupplier(ctx: any, supplierId: Supplier["_id"]): Promise<Supplier> {
+  const project: ProjectRef = await ctx.runQuery(api.suppliers.getSupplierProjectId, { supplierId });
   if (!project) throw new Error("Supplier not found");
-  const suppliers = await ctx.runQuery(api.suppliers.listSuppliers, { projectId: project.projectId });
-  const supplier = suppliers.find((s: any) => s._id === supplierId);
+  const suppliers: Supplier[] = await ctx.runQuery(api.suppliers.listSuppliers, { projectId: project.projectId });
+  const supplier: Supplier | undefined = suppliers.find((s: Supplier) => s._id === supplierId);
   if (!supplier) throw new Error("Supplier not found");
   return supplier;
 }
 
-async function firecrawlRequest(ctx: any, url: string, operation: "research" | "map") {
+async function firecrawlRequest(ctx: any, url: string, operation: "research" | "map"): Promise<any> {
   const client = new FirecrawlClient(components.firecrawl);
   if (operation === "research") {
     const page = await client.scrape(ctx, url, { formats: ["markdown"] });
@@ -99,8 +103,8 @@ async function firecrawlRequest(ctx: any, url: string, operation: "research" | "
 
 export const researchSupplier = action({
   args: { supplierId: v.id("suppliers") }, returns: v.any(),
-  handler: async (ctx, args) => {
-    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+  handler: async (ctx, args): Promise<any> => {
+    const supplier: Supplier = await getOwnedSupplier(ctx, args.supplierId);
     if (!supplier.website) throw new Error("Supplier has no website to research.");
     return firecrawlRequest(ctx, supplier.website, "research");
   },
@@ -108,8 +112,8 @@ export const researchSupplier = action({
 
 export const mapSupplierWebsite = action({
   args: { supplierId: v.id("suppliers") }, returns: v.any(),
-  handler: async (ctx, args) => {
-    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+  handler: async (ctx, args): Promise<any> => {
+    const supplier: Supplier = await getOwnedSupplier(ctx, args.supplierId);
     if (!supplier.website) throw new Error("Supplier has no website to map.");
     return firecrawlRequest(ctx, supplier.website, "map");
   },
@@ -117,11 +121,10 @@ export const mapSupplierWebsite = action({
 
 export const crawlSupplierWebsite = action({
   args: { supplierId: v.id("suppliers") }, returns: v.any(),
-  handler: async (ctx, args) => {
-    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+  handler: async (ctx, args): Promise<any> => {
+    const supplier: Supplier = await getOwnedSupplier(ctx, args.supplierId);
     if (!supplier.website) throw new Error("Supplier has no website to crawl.");
     const firecrawl = new FirecrawlClient(components.firecrawl);
-    // Poll mode works in local Convex development without requiring Firecrawl to reach a public webhook.
     return await firecrawl.startCrawl(ctx, {
       url: supplier.website,
       mode: "poll",
@@ -132,8 +135,8 @@ export const crawlSupplierWebsite = action({
 
 export const refreshSupplierWebsite = action({
   args: { supplierId: v.id("suppliers") }, returns: v.any(),
-  handler: async (ctx, args) => {
-    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+  handler: async (ctx, args): Promise<any> => {
+    const supplier: Supplier = await getOwnedSupplier(ctx, args.supplierId);
     if (!supplier.website) throw new Error("Supplier has no website to refresh.");
     return { ...(await firecrawlRequest(ctx, supplier.website, "research")), refreshedAt: Date.now() };
   },
@@ -144,14 +147,14 @@ export const simulatorReplies = action({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity(); if (!isDemoAdmin(identity)) throw new Error("Demo simulator is admin-only.");
     const project = await ctx.runQuery(api.projects.getProject, { projectId: args.projectId });
-    const supplier = await ctx.runQuery(api.suppliers.listDemoSuppliers, { projectId: args.projectId }).then(xs => xs.find(x => x._id === args.supplierId));
+    const supplier = await ctx.runQuery(api.suppliers.listDemoSuppliers, { projectId: args.projectId }).then((xs: Supplier[]) => xs.find((x: Supplier) => x._id === args.supplierId));
     if (!supplier) throw new Error("Simulator is limited to demo suppliers."); if (!project.inboxId) throw new Error("Project inbox is not ready."); if (!supplier.email) throw new Error("Demo supplier has no inbox address.");
     const apiKey = process.env.AGENTMAIL_API_KEY; if (!apiKey) throw new Error("AGENTMAIL_API_KEY is not configured.");
     const baseUrl = process.env.AGENTMAIL_BASE_URL ?? "https://api.agentmail.to/v0";
     const lines = await ctx.runQuery(api.lineItems.listLineItems, { projectId: args.projectId }); const selected = lines.slice(0, Math.min(lines.length, 5)); const price = (i: number) => 10000 + i * 2500;
     const subjectPrefix = "[BidWire:" + project._id + "] "; let subject = subjectPrefix + "Quotation — " + project.name, text = "";
     if (args.scenario === "decline") { subject = subjectPrefix + "Unable to quote — " + project.name; text = "Thanks for the RFQ. Unfortunately we are unable to supply this order at this time. Please keep us in mind for a future project."; }
-    else { const revised = args.scenario === "revised_price"; text = "Dear Bidwire,\\n\\nPlease find our " + (revised ? "revised " : "") + "quotation:\\n\\n" + selected.map((x, i) => x.name + " — " + x.quantity + " " + x.unit + " @ " + price(i) * (revised ? 0.94 : 1) + " NGN").join("\\n") + "\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier"; if (args.scenario === "pdf_quote") subject = subjectPrefix + "Quotation attached — " + project.name; }
+    else { const revised = args.scenario === "revised_price"; text = "Dear Bidwire,\\n\\nPlease find our " + (revised ? "revised " : "") + "quotation:\\n\\n" + selected.map((x: Doc<"lineItems">, i: number) => x.name + " — " + x.quantity + " " + x.unit + " @ " + price(i) * (revised ? 0.94 : 1) + " NGN").join("\\n") + "\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier"; if (args.scenario === "pdf_quote") subject = subjectPrefix + "Quotation attached — " + project.name; }
     const response = await fetch(baseUrl + "/inboxes/" + encodeURIComponent(supplier.email) + "/messages", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ to: project.inboxAddress, subject, text, ...(args.scenario === "pdf_quote" ? { attachments: [{ content: demoPdfBase64("Demo supplier quotation"), filename: "quote.pdf", content_type: "application/pdf" }] } : {}) }) });
     if (!response.ok) throw new Error("AgentMail simulator send failed: " + (await response.text()).slice(0, 300)); return null;
   },
