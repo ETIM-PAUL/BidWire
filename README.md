@@ -2,13 +2,13 @@
 
 > **From project scope to supplier award, with the evidence and approvals connected.**
 
-BidWire is a hackathon-built procurement workspace for contractors and procurement teams. It turns a natural-language project brief into a structured materials/BOQ workflow, discovers relevant suppliers, drafts and sends RFQs, receives supplier replies through AgentMail, extracts quotes from email/PDF content, compares coverage and price, prepares negotiation messages, validates awards, and prepares final supplier communications for human approval.
+BidWire is a hackathon-built procurement workspace for contractors and procurement teams. It turns a natural-language project brief into a structured materials/BOQ workflow, discovers relevant suppliers, researches supplier evidence, drafts and sends RFQs, receives supplier replies through AgentMail, extracts quotes from email/PDF content, compares coverage and price, prepares negotiation messages, validates awards, and prepares final supplier communications for human approval.
 
 ## What makes the current build different
 
 BidWire is not only an RFQ generator or a comparison table. The project keeps the procurement context connected across the full lifecycle:
 
-**Project → BOQ → Suppliers → RFQ → Inbox → Quote extraction → Compare → Negotiate → Award → Supplier communication → Workspace intelligence**
+**Project → BOQ → Suppliers → Supplier Intelligence → RFQ → Inbox → Quote extraction → Compare → Negotiate → Award → Supplier communication → Workspace intelligence**
 
 The system is deliberately human-in-the-loop. AI prepares structured information and drafts; application validation protects the workflow; the contractor controls supplier selection, negotiation and final outbound commitments.
 
@@ -24,11 +24,23 @@ The system is deliberately human-in-the-loop. AI prepares structured information
 ### 2. Relevant supplier discovery
 - Firecrawl-backed supplier discovery.
 - Material/category-aware supplier targeting.
+- Location-aware supplier research and verification.
 - Demo suppliers for reproducible testing.
 - Manual supplier support.
 - Supplier email identity is kept separate from the project's own procurement inbox.
 
-### 3. RFQ automation
+### 3. Supplier web intelligence
+- Research a supplier against the actual project location and requested BOQ categories.
+- Evidence-backed location/category verification.
+- Public source links and match reasons.
+- Structured observations of publicly listed prices when available.
+- Supplier research status and evidence stored in Convex.
+- Website mapping and crawling.
+- Refresh/research actions for supplier websites.
+
+Web information is advisory evidence. A website-listed price is never silently treated as a supplier quotation.
+
+### 4. RFQ automation
 - Supplier-specific RFQ drafts.
 - RFQs are scoped to the items actually selected for the supplier.
 - Editable drafts before sending.
@@ -36,14 +48,14 @@ The system is deliberately human-in-the-loop. AI prepares structured information
 - Demo-mode allowlisting for safe local testing.
 - RFQ/thread/message activity is recorded in Convex.
 
-### 4. Real supplier inbox loop
+### 5. Real supplier inbox loop
 - Each project can have an AgentMail inbox.
 - Outbound RFQs create tracked supplier threads.
 - AgentMail webhooks bring inbound replies back into BidWire.
 - Replies remain attached to the project and supplier context.
 - Incoming email is treated as untrusted data before AI classification/extraction.
 
-### 5. AI quote extraction
+### 6. AI quote extraction
 Supplier replies can contain plain text, tables or PDF quotations. BidWire extracts:
 - line descriptions
 - unit prices
@@ -59,70 +71,51 @@ Matching is validated against line items belonging to the current project. Low-c
 
 Known unit conversions are deterministic code, not LLM arithmetic.
 
-### 6. Compare workspace
+### 7. Compare workspace
 Compare exposes:
 - supplier coverage
 - missing items
 - quoted prices
+- published supplier prices
 - basket totals
 - single-supplier coverage
 - split-award possibilities
 - revised quote lines
 - low-confidence matches
-- decision brief / print view
+- decision brief / download view
 
-The comparison keeps price and scope coverage visible together.
+The comparison keeps price and scope coverage visible together. Published web prices are observations and do not replace actual supplier quotes.
 
-### 7. Follow-ups
+### 8. Follow-ups
 - Scheduled follow-up checks for non-responding suppliers.
 - Controlled follow-up drafting.
 - Optional auto-approval setting.
 - Maximum follow-up limit.
 - Cancellation stops pending follow-up schedules.
 
-### 8. Negotiation
+### 9. Negotiation
 - Negotiation can be launched from supplier/quote context.
 - AI creates an editable negotiation draft.
 - Draft is reviewed in a modal.
 - Negotiation is disabled once the project is awarded.
 
-### 9. Award validation
+### 10. Award validation
 - Single-supplier and split-award modes.
 - Award scope is based on sent RFQ scope.
 - Backend validation prevents awarding an item without a valid quote.
 - Delivery address/date are required.
 - Award and validation events are recorded.
 - Pending RFQ drafts are discarded after award.
+- Supplier discovery and material removal are disabled after award.
 
-### 10. Award communication
+### 11. Award communication
 After an award, BidWire prepares supplier communications such as purchase-order and notification drafts. The user reviews them in a modal, can edit the message, and explicitly chooses **Approve & send**. Award communication is not silently sent by the AI.
 
-### 11. Supplier intelligence
-The Suppliers tab now exposes evidence-backed review signals from the current project and prior projects in the workspace where supplier identity can be matched.
-
-Signals include:
-- quote coverage
-- extraction/match confidence
-- quote revisions
-- observed lead time
-- quote validity
-- delivery cost
-- missing scope
-- negotiation prompts
-
-These are review signals, not an automatic supplier ranking.
-
-## Then phase — procurement memory and workspace intelligence
-
-The latest build adds an **Insights** workspace at `/insights`.
-
-It aggregates data BidWire has actually collected instead of inventing external market information:
-
+### 12. Procurement memory and workspace intelligence
+The Insights workspace aggregates data BidWire has actually collected instead of inventing external market information:
 - project and award counts
-- active vs awarded projects
 - supplier response counts
 - awarded spend grouped by currency
-- largest awarded projects
 - repeated observed prices for the same project item/unit/currency
 - observed price range and average
 - latest vs previous observed price direction
@@ -133,15 +126,16 @@ It aggregates data BidWire has actually collected instead of inventing external 
 - projects awaiting comparison
 - scheduled follow-up threads
 
-Historical price and lead-time sections intentionally require multiple observations. BidWire labels these as observed signals rather than forecasts.
+Historical sections require sufficient observations and are presented as observed signals rather than forecasts.
 
 ## Safety and trust boundaries
 
-BidWire's architecture separates:
+BidWire separates:
 
 **AI preparation**
 - BOQ generation
 - supplier discovery assistance
+- supplier research
 - quote extraction
 - RFQ drafting
 - follow-up drafting
@@ -163,7 +157,7 @@ BidWire's architecture separates:
 - negotiation send
 - final award communication
 
-Supplier emails are treated as untrusted input. AI extraction is constrained by structured schemas and project-owned IDs; inbound content cannot directly choose another project's records.
+Supplier emails and public web content are treated as untrusted input. Structured extraction is constrained by project-owned context; inbound content cannot directly choose another project's records.
 
 ## Stack
 
@@ -183,22 +177,33 @@ npx convex dev
 npm run dev
 ```
 
-Keep API keys in local/Convex environment configuration and out of git.
+Keep API keys in local/Convex environment configuration and out of git. AgentMail component credentials such as `AGENTMAIL_API_KEY` must be set on the Convex deployment; a frontend `.env` file does not automatically populate component-side Convex environment variables.
+
+For inbound email testing, the AgentMail webhook must target the actual application route:
+
+```text
+https://<public-host>/agentmail/webhook
+```
+
+not merely the ngrok root.
 
 ## Demo path
 
 1. Create a project or launch the sample job.
 2. Generate/review materials.
 3. Discover and select suppliers.
-4. Draft and approve RFQs.
-5. Send RFQs through AgentMail.
-6. Reply from supplier inboxes.
-7. Watch replies enter BidWire and become quotes.
-8. Review Compare and Needs Review.
-9. Negotiate where needed.
-10. Validate and award.
-11. Review award emails and explicitly send them.
-12. Open **Insights** to show the procurement memory layer.
+4. Research a supplier and inspect its evidence.
+5. Map/crawl a supplier website.
+6. Review published-price observations.
+7. Draft and approve RFQs.
+8. Send RFQs through AgentMail.
+9. Reply from supplier inboxes.
+10. Watch replies enter BidWire and become quotes.
+11. Review Compare and Needs Review.
+12. Negotiate where needed.
+13. Validate and award.
+14. Review award emails and explicitly send them.
+15. Open **Insights** to show the procurement memory layer.
 
 ## Product principle
 
