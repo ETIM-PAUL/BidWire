@@ -1,46 +1,67 @@
 @import 'tailwindcss';
 
-:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme: dark; font-synthesis: none; }
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: dark;
+  font-synthesis: none;
+  --bw-bg: #070a0d;
+  --bw-panel: rgba(14, 19, 24, .82);
+  --bw-panel-strong: #10161c;
+  --bw-border: rgba(255,255,255,.085);
+  --bw-muted: #7d8791;
+  --bw-text: #f5f7f8;
+  --bw-accent: #42e6b1;
+  --bw-accent-soft: rgba(66,230,177,.10);
+}
 * { box-sizing: border-box; }
-html { background: #070908; }
-body { margin: 0; min-width: 320px; background: radial-gradient(circle at 50% -10%, rgba(245,158,11,.07), transparent 34rem), #070908; color: #f5f5f5; }
+html { background: var(--bw-bg); }
+body { margin: 0; min-width: 320px; background:
+  radial-gradient(circle at 12% -8%, rgba(66,230,177,.10), transparent 30rem),
+  radial-gradient(circle at 92% 8%, rgba(74,144,255,.07), transparent 28rem),
+  var(--bw-bg); color: var(--bw-text); }
 button, input, textarea, select { font: inherit; }
 button { min-height: 40px; }
 button:not(:disabled) { cursor: pointer; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
-::selection { background: rgba(245,158,11,.25); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--bw-accent); outline-offset: 3px; }
+::selection { background: rgba(66,230,177,.22); }
 
-.bidwire-skeleton { border-radius: .65rem; background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.09), rgba(255,255,255,.045)); background-size: 200% 100%; animation: bidwire-shimmer 1.5s ease-in-out infinite; }
+.bidwire-app-bg { min-height: 100vh; background: linear-gradient(180deg, rgba(255,255,255,.012), transparent 28rem); }
+.bidwire-shell { width: min(1480px, calc(100% - 32px)); margin: 0 auto; }
+.bidwire-topbar { border: 1px solid var(--bw-border); background: rgba(9,13,17,.76); box-shadow: 0 18px 70px rgba(0,0,0,.22); backdrop-filter: blur(22px); }
+.bidwire-panel { border: 1px solid var(--bw-border); background: var(--bw-panel); box-shadow: 0 18px 60px rgba(0,0,0,.14); backdrop-filter: blur(18px); }
+.bidwire-panel-hover { transition: border-color .2s ease, transform .2s ease, background .2s ease, box-shadow .2s ease; }
+.bidwire-panel-hover:hover { border-color: rgba(255,255,255,.15); background: rgba(17,23,29,.9); box-shadow: 0 24px 70px rgba(0,0,0,.2); transform: translateY(-2px); }
+.bidwire-eyebrow { color: var(--bw-accent); font-size: .7rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+.bidwire-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 42px; border-radius: .8rem; padding: .62rem .95rem; font-size: .875rem; font-weight: 700; transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease, opacity .18s ease; }
+.bidwire-button:disabled { opacity: .42; cursor: not-allowed; }
+.bidwire-button-primary { color: #06100c; background: var(--bw-accent); box-shadow: 0 8px 28px rgba(66,230,177,.16); }
+.bidwire-button-primary:hover:not(:disabled) { background: #6aefc5; transform: translateY(-1px); box-shadow: 0 12px 34px rgba(66,230,177,.22); }
+.bidwire-button-secondary { border: 1px solid var(--bw-border); color: #dce2e6; background: rgba(255,255,255,.035); }
+.bidwire-button-secondary:hover:not(:disabled) { border-color: rgba(255,255,255,.17); background: rgba(255,255,255,.075); transform: translateY(-1px); }
+.bidwire-button-ghost { color: #8d98a2; background: transparent; }
+.bidwire-button-ghost:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,.045); }
+.bidwire-status { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid rgba(255,255,255,.10); border-radius: 999px; padding: .25rem .6rem; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.bidwire-status-neutral { color: #a5adb5; background: rgba(255,255,255,.04); }
+.bidwire-status-amber { color: #f7c65b; border-color: rgba(247,198,91,.22); background: rgba(247,198,91,.08); }
+.bidwire-status-green { color: var(--bw-accent); border-color: rgba(66,230,177,.22); background: var(--bw-accent-soft); }
+.bidwire-status-red { color: #ff8585; border-color: rgba(255,89,89,.24); background: rgba(255,89,89,.08); }
+.bidwire-status-blue { color: #7bb4ff; border-color: rgba(77,150,255,.24); background: rgba(77,150,255,.08); }
+.bidwire-field { color: #eef2f4; background: rgba(255,255,255,.035); border: 1px solid var(--bw-border); transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.bidwire-field::placeholder { color: #4f5962; }
+.bidwire-field:focus { border-color: rgba(66,230,177,.42); background: rgba(255,255,255,.055); box-shadow: 0 0 0 4px rgba(66,230,177,.06); outline: none; }
+.bidwire-skeleton { border-radius: .75rem; background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.10), rgba(255,255,255,.045)); background-size: 200% 100%; animation: bidwire-shimmer 1.5s ease-in-out infinite; }
 @keyframes bidwire-shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
-
-.bidwire-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 40px; border-radius: .65rem; padding: .55rem .85rem; font-size: .875rem; font-weight: 600; transition: .18s ease; }
-.bidwire-button:disabled { opacity: .5; cursor: not-allowed; }
-.bidwire-button-primary { background: #f5f5f5; color: #111; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-.bidwire-button-primary:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
-.bidwire-button-secondary { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.035); color: #ddd; }
-.bidwire-button-secondary:hover:not(:disabled) { background: rgba(255,255,255,.08); }
-.bidwire-button-danger { background: #dc2626; color: white; }
-.bidwire-button-danger:hover:not(:disabled) { background: #ef4444; }
-
-.bidwire-status { display: inline-flex; align-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; padding: .22rem .55rem; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.bidwire-status-neutral { color: #a3a3a3; background: rgba(255,255,255,.04); }
-.bidwire-status-amber { color: #fbbf24; border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.08); }
-.bidwire-status-green { color: #34d399; border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.08); }
-.bidwire-status-red { color: #f87171; border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.08); }
-.bidwire-status-blue { color: #60a5fa; border-color: rgba(59,130,246,.25); background: rgba(59,130,246,.08); }
-
-.bidwire-empty { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed rgba(255,255,255,.1); border-radius: 1rem; padding: 2rem; text-align: center; background: rgba(255,255,255,.015); }
-.bidwire-empty-icon { display: grid; height: 44px; width: 44px; place-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: .8rem; background: rgba(255,255,255,.035); color: #f59e0b; margin-bottom: 1rem; }
-.bidwire-dialog { width: min(440px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 1rem; background: #101311; padding: 1.35rem; box-shadow: 0 28px 90px rgba(0,0,0,.55); }
-.bidwire-dialog-icon { display: grid; height: 38px; width: 38px; place-items: center; border-radius: .7rem; background: rgba(245,158,11,.1); color: #fbbf24; font-weight: 800; margin-bottom: 1rem; }
-
-.bidwire-toast { border: 1px solid rgba(255,255,255,.11); border-radius: .8rem; background: rgba(16,19,17,.96); padding: .8rem; box-shadow: 0 18px 50px rgba(0,0,0,.35); backdrop-filter: blur(18px); animation: bidwire-toast-in .2s ease-out; }
-.bidwire-toast-success { border-color: rgba(16,185,129,.25); }
+.bidwire-empty { display: flex; min-height: 260px; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed rgba(255,255,255,.10); border-radius: 1.1rem; padding: 2rem; text-align: center; background: rgba(255,255,255,.015); }
+.bidwire-empty-icon { display: grid; height: 46px; width: 46px; place-items: center; border: 1px solid rgba(66,230,177,.18); border-radius: .85rem; background: var(--bw-accent-soft); color: var(--bw-accent); margin-bottom: 1rem; }
+.bidwire-dialog { width: min(520px, 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 1.15rem; background: #10161c; padding: 1.4rem; box-shadow: 0 28px 100px rgba(0,0,0,.62); }
+.bidwire-dialog-icon { display: grid; height: 40px; width: 40px; place-items: center; border-radius: .75rem; background: var(--bw-accent-soft); color: var(--bw-accent); font-weight: 800; margin-bottom: 1rem; }
+.bidwire-toast { border: 1px solid rgba(255,255,255,.11); border-radius: .85rem; background: rgba(16,22,28,.96); padding: .8rem; box-shadow: 0 18px 50px rgba(0,0,0,.38); backdrop-filter: blur(18px); animation: bidwire-toast-in .2s ease-out; }
+.bidwire-toast-success { border-color: rgba(66,230,177,.25); }
 .bidwire-toast-error { border-color: rgba(239,68,68,.3); }
 .bidwire-toast-info { border-color: rgba(59,130,246,.25); }
-.bidwire-toast-icon { display: grid; height: 26px; width: 26px; flex: 0 0 26px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.07); color: #fbbf24; font-size: .75rem; font-weight: 800; }
-.bidwire-toast-close { min-height: 24px; color: #737373; font-size: 1.15rem; line-height: 1; }
+.bidwire-toast-icon { display: grid; height: 26px; width: 26px; flex: 0 0 26px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.07); color: var(--bw-accent); font-size: .75rem; font-weight: 800; }
+.bidwire-toast-close { min-height: 24px; color: #737b83; font-size: 1.15rem; line-height: 1; }
 .bidwire-toast-close:hover { color: white; }
 @keyframes bidwire-toast-in { from { opacity: 0; transform: translateY(-6px) scale(.98) } to { opacity: 1; transform: translateY(0) scale(1) } }
 
-@media (max-width: 768px) { body { font-size: 15px; } }
+@media (max-width: 768px) { .bidwire-shell { width: min(100% - 20px, 1480px); } body { font-size: 15px; } }
