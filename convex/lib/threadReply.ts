@@ -7,18 +7,11 @@ const agentmail = new AgentMail(components.agentmail);
 
 export type ThreadReplyResult = { ok: true } | { ok: false; blockedReason: string };
 
-// Shared by followups.ts's performFollowUpSend and negotiate.ts's send
-// logic - any code path that replies to a supplier in their existing
-// thread. Enforces the DEMO_MODE allowlist (this app's non-negotiable
-// rule: every outbound send must respect it) before ANY send is attempted,
-// then resolves AgentMail's real message ID for the thread's original
-// outbound message (only knowable after the fact, since sending is
-// async-enqueued) to reply properly in-thread, falling back to a fresh
-// "Re:" message if that isn't resolvable yet.
-//
-// Deliberately does NOT touch draft status or any caller-specific
-// bookkeeping (follow-up counts, negotiation state) - that stays with each
-// caller, which knows what kind of send this is.
+// Shared by followups.ts and negotiate.ts for supplier replies.
+// The project inbox is ALWAYS the sender. The supplier's stored email is
+// ALWAYS the recipient. We pass `to` explicitly even for threaded replies so
+// a stale/mis-associated AgentMail message cannot cause the inbox address to
+// become both From and To.
 export async function replyInThread(
   ctx: MutationCtx,
   args: {
@@ -29,25 +22,19 @@ export async function replyInThread(
   },
 ): Promise<ThreadReplyResult> {
   const supplier = await ctx.db.get(args.supplierId);
-  if (!supplier) {
-    throw new Error("Supplier not found");
-  }
-  if (!supplier.email) {
-    throw new Error("Supplier has no email on file");
-  }
+  if (!supplier) throw new Error("Supplier not found");
+  if (!supplier.email) throw new Error("Supplier has no email on file");
+
   const project = await ctx.db.get(args.projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  if (!project.inboxId) {
-    throw new Error("Project has no inbox yet");
-  }
+  if (!project) throw new Error("Project not found");
+  if (!project.inboxId) throw new Error("Project has no inbox yet");
 
   if (process.env.DEMO_MODE === "true") {
     const allowlist = (process.env.DEMO_ALLOWLIST ?? "")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter((s) => s.length > 0);
+
     if (!allowlist.includes(supplier.email.toLowerCase())) {
       await ctx.db.insert("events", {
         projectId: args.projectId,
@@ -70,9 +57,7 @@ export async function replyInThread(
     .query("threads")
     .withIndex("by_supplier", (q) => q.eq("supplierId", args.supplierId))
     .first();
-  if (!thread) {
-    throw new Error("No thread for this supplier yet");
-  }
+  if (!thread) throw new Error("No thread for this supplier yet");
 
   const threadMessages = await ctx.db
     .query("messages")
@@ -91,14 +76,18 @@ export async function replyInThread(
       );
       parentAgentmailMessageId = status?.agentmailMessageId ?? null;
     } catch {
-      // Couldn't resolve yet (still pending, or a transient API error) -
-      // fall through to the plain-send fallback below.
+      // If the original outbound is not resolvable yet, send a fresh message
+      // with the supplier email explicitly set as the recipient.
     }
   }
 
-  const fallbackSubject = originalOutbound ? `Re: ${originalOutbound.subject}` : "Re: your quote request";
+  const fallbackSubject = originalOutbound
+    ? `Re: ${originalOutbound.subject}`
+    : "Re: your quote request";
+
   const newOutboundId = parentAgentmailMessageId
     ? await agentmail.replyToMessage(ctx, project.inboxId, parentAgentmailMessageId, {
+        to: supplier.email,
         text: args.body,
       })
     : await agentmail.sendMessage(ctx, project.inboxId, {
