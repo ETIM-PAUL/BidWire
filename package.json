@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {"dev":"vite","build":"tsc -b && vite build","lint":"oxlint","preview":"vite preview","test":"vitest run"},
-  "dependencies": {"@agentmail/convex":"^0.1.0","@convex-dev/action-retrier":"^0.3.1","@convex-dev/auth":"^0.0.95","@convex-dev/rate-limiter":"^0.4.0","@firecrawl/firecrawl-convex":"^0.1.1","convex":"^1.46.0","openai":"^7.17.0","pdfjs-dist":"^6.3.289","react":"^19.2.8","react-dom":"^19.2.8","react-router-dom":"^7.18.4"},
+  "scripts": {"dev":"vite","build":"tsc -b && vite build","lint":"oxlint","preview":"vite preview","test":"vitest run","deploy":"npx @convex-dev/static-hosting deploy"},
+  "dependencies": {"@agentmail/convex":"^0.1.0","@convex-dev/action-retrier":"^0.3.1","@convex-dev/auth":"^0.0.95","@convex-dev/rate-limiter":"^0.4.0","@convex-dev/static-hosting":"^0.2.1","@firecrawl/firecrawl-convex":"^0.1.1","convex":"^1.46.0","openai":"^7.17.0","pdfjs-dist":"^6.3.289","react":"^19.2.8","react-dom":"^19.2.8","react-router-dom":"^7.18.4"},
   "devDependencies": {"@edge-runtime/vm":"^5.0.0","@tailwindcss/vite":"^4.3.3","@types/node":"^24.13.3","@types/react":"^19.2.18","@types/react-dom":"^19.2.7","@vitejs/plugin-react":"^6.1.1","convex-test":"^0.0.58","oxlint":"^1.81.0","tailwindcss":"^4.3.3","typescript":"~6.0.2","vite":"^8.3.0","vitest":"^5.0.1"}
 }
