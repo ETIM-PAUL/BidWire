@@ -22,9 +22,6 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
   const [error, setError] = useState<string | null>(null)
   const [openDraftId, setOpenDraftId] = useState<Id<'drafts'> | null>(null)
   const [autoOpened, setAutoOpened] = useState(false)
-
-  if (preview === undefined) return <div className="animate-pulse rounded-2xl border border-white/10 p-5"><div className="h-5 w-48 rounded bg-white/10"/><div className="mt-4 h-20 rounded bg-white/5"/></div>
-
   const pending = drafts?.filter(d => (d.kind === 'award' || d.kind === 'decline') && d.status === 'pending') ?? []
   const selectedDraft = pending.find(d => d._id === openDraftId) ?? null
 
@@ -34,18 +31,12 @@ export function AwardPanel({ project }: { project: Doc<'projects'> }) {
       setOpenDraftId(first._id)
       setAutoOpened(true)
     }
-  }, [savedAward, pending.length, autoOpened])
+  }, [savedAward, pending, autoOpened])
+
+  if (preview === undefined) return <div className="animate-pulse rounded-2xl border border-white/10 p-5"><div className="h-5 w-48 rounded bg-white/10"/><div className="mt-4 h-20 rounded bg-white/5"/></div>
 
   if (savedAward) return <div className="space-y-4 border-t border-white/10 pt-5">
-    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4">
-      <p className="text-emerald-400 text-sm font-medium">Project awarded</p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm">
-        <div><p className="text-xs text-neutral-500">Total spend</p><p className="text-neutral-200 font-medium">{savedAward.totalSpend.toLocaleString()} {project.currency}</p></div>
-        <div><p className="text-xs text-neutral-500">Savings vs highest quote</p><p className="text-neutral-200 font-medium">{Math.max(0, savedAward.highestQuote - savedAward.totalSpend).toLocaleString()} {project.currency}</p></div>
-        <div><p className="text-xs text-neutral-500">Savings vs published</p><p className="text-neutral-200 font-medium">{Math.max(0, savedAward.publishedListTotal - savedAward.totalSpend).toLocaleString()} {project.currency}</p></div>
-        <div><p className="text-xs text-neutral-500">Time to award</p><p className="text-neutral-200 font-medium">{Math.round((savedAward.awardedAt - project.createdAt) / 3600000)}h</p></div>
-      </div>
-    </div>
+    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4"><p className="text-emerald-400 text-sm font-medium">Project awarded</p><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 text-sm"><div><p className="text-xs text-neutral-500">Total spend</p><p className="text-neutral-200 font-medium">{savedAward.totalSpend.toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs highest quote</p><p className="text-neutral-200 font-medium">{Math.max(0, savedAward.highestQuote - savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Savings vs published</p><p className="text-neutral-200 font-medium">{Math.max(0, savedAward.publishedListTotal - savedAward.totalSpend).toLocaleString()} {project.currency}</p></div><div><p className="text-xs text-neutral-500">Time to award</p><p className="text-neutral-200 font-medium">{Math.round((savedAward.awardedAt - project.createdAt) / 3600000)}h</p></div></div></div>
     {pending.length > 0 ? <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold">Award emails ready</h3><p className="text-xs text-neutral-500 mt-1">Review each email before it is sent. Nothing is sent automatically.</p></div><button onClick={() => setOpenDraftId((pending.find(d => d.kind === 'award') ?? pending[0])._id)} className="bidwire-button bidwire-button-primary text-xs">Review &amp; send</button></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{pending.map(d => <button key={d._id} onClick={() => setOpenDraftId(d._id)} className="rounded-xl border border-white/10 p-3 text-left hover:border-white/20 transition"><p className="text-sm font-medium">{d.kind === 'award' ? 'Purchase order' : 'Supplier notification'}</p><p className="text-xs text-neutral-500 truncate mt-1">{d.subject}</p></button>)}</div></div> : <div className="rounded-xl border border-white/10 p-4 text-sm text-neutral-500">All award emails have been sent.</div>}
     {selectedDraft && <AwardEmailModal draft={selectedDraft} pending={pending} onClose={() => setOpenDraftId(null)} onSelect={setOpenDraftId} send={send} updateDraft={updateDraft} />}
   </div>
@@ -84,29 +75,7 @@ function AwardEmailModal({ draft, pending, onClose, onSelect, send, updateDraft 
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const { toast } = useToast()
-
   useEffect(() => { setBody(draft.body); setMessage(null) }, [draft._id, draft.body])
-
-  async function handleSend() {
-    setSending(true); setMessage(null)
-    try {
-      await updateDraft({ draftId: draft._id, body })
-      const result = await send({ draftId: draft._id })
-      if (!result.ok) { setMessage(result.blockedReason ?? 'The email was not sent.'); return }
-      toast('success', 'Email sent', 'The supplier notification was sent through AgentMail.')
-      const next = pending.find(d => d._id !== draft._id)
-      if (next) onSelect(next._id); else onClose()
-    } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not send email.') }
-    finally { setSending(false) }
-  }
-
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="award-email-title">
-    <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0b0e0c] shadow-2xl">
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><div><h3 id="award-email-title" className="text-base font-semibold">Review award email</h3><p className="text-xs text-neutral-500 mt-1">Nothing is sent until you approve it.</p></div><button onClick={onClose} className="text-neutral-500 hover:text-white text-xl" aria-label="Close">×</button></div>
-      <div className="grid md:grid-cols-[180px_1fr]">
-        <div className="border-b md:border-b-0 md:border-r border-white/10 p-3 space-y-1">{pending.map(item => <button key={item._id} onClick={() => onSelect(item._id)} className={`w-full rounded-lg px-3 py-2 text-left ${item._id === draft._id ? 'bg-white/10 text-white' : 'text-neutral-500 hover:bg-white/[.04]'}`}><p className="text-xs font-medium">{item.kind === 'award' ? 'Purchase order' : 'Supplier notification'}</p><p className="truncate text-[10px] mt-0.5">{item.subject}</p></button>)}</div>
-        <div className="p-5"><div className="mb-3 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-wider text-neutral-600">Subject</p><p className="mt-1 text-sm text-neutral-200">{draft.subject}</p></div><label className="text-xs text-neutral-500">Message<textarea value={body} onChange={e => setBody(e.target.value)} rows={14} className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-neutral-900 px-3 py-3 text-sm leading-6 text-neutral-200 outline-none focus:border-white/30"/></label>{message && <div role="alert" className="mt-3 rounded-xl border border-red-500/20 bg-red-500/[.05] p-3 text-sm text-red-300">{message}</div>}<div className="mt-4 flex justify-end gap-2"><button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-neutral-400 hover:text-white">Not now</button><button disabled={sending} onClick={() => void handleSend()} className="rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50">{sending ? 'Sending…' : 'Approve & send'}</button></div></div>
-      </div>
-    </div>
-  </div>
+  async function handleSend() { setSending(true); setMessage(null); try { await updateDraft({ draftId: draft._id, body }); const result = await send({ draftId: draft._id }); if (!result.ok) { setMessage(result.blockedReason ?? 'The email was not sent.'); return } toast('success', 'Email sent', 'The supplier notification was sent through AgentMail.'); const next = pending.find(d => d._id !== draft._id); if (next) onSelect(next._id); else onClose() } catch (e) { setMessage(e instanceof Error ? e.message : 'Could not send email.') } finally { setSending(false) } }
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="award-email-title"><div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0b0e0c] shadow-2xl"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><div><h3 id="award-email-title" className="text-base font-semibold">Review award email</h3><p className="text-xs text-neutral-500 mt-1">Nothing is sent until you approve it.</p></div><button onClick={onClose} className="text-neutral-500 hover:text-white text-xl" aria-label="Close">×</button></div><div className="grid md:grid-cols-[180px_1fr]"><div className="border-b md:border-b-0 md:border-r border-white/10 p-3 space-y-1">{pending.map(item => <button key={item._id} onClick={() => onSelect(item._id)} className={`w-full rounded-lg px-3 py-2 text-left ${item._id === draft._id ? 'bg-white/10 text-white' : 'text-neutral-500 hover:bg-white/[.04]'}`}><p className="text-xs font-medium">{item.kind === 'award' ? 'Purchase order' : 'Supplier notification'}</p><p className="truncate text-[10px] mt-0.5">{item.subject}</p></button>)}</div><div className="p-5"><div className="mb-3 rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-[10px] uppercase tracking-wider text-neutral-600">Subject</p><p className="mt-1 text-sm text-neutral-200">{draft.subject}</p></div><label className="text-xs text-neutral-500">Message<textarea value={body} onChange={e => setBody(e.target.value)} rows={14} className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-neutral-900 px-3 py-3 text-sm leading-6 text-neutral-200 outline-none focus:border-white/30"/></label>{message && <div role="alert" className="mt-3 rounded-xl border border-red-500/20 bg-red-500/[.05] p-3 text-sm text-red-300">{message}</div>}<div className="mt-4 flex justify-end gap-2"><button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-neutral-400 hover:text-white">Not now</button><button disabled={sending} onClick={() => void handleSend()} className="rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50">{sending ? 'Sending…' : 'Approve & send'}</button></div></div></div></div></div>
 }
