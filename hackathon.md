@@ -6,7 +6,7 @@ BidWire is an AI-assisted procurement workspace for contractors and procurement 
 
 **Current workflow:**
 
-Project brief → Materials / BOQ → Supplier discovery → RFQ drafts → RFQ sending → Supplier inbox → Quote extraction → Compare → Negotiation → Award validation → Award communication → Procurement insights
+Project brief → Materials / BOQ → Supplier discovery → Supplier web intelligence → RFQ drafts → RFQ sending → Supplier inbox → Quote extraction → Compare → Negotiation → Award validation → Award communication → Procurement insights
 
 The core product principle is human-in-the-loop: AI prepares information and communication, deterministic application logic validates important boundaries, and the contractor remains in control of supplier selection and commercial commitments.
 
@@ -34,6 +34,7 @@ BidWire keeps those records connected to the project.
 - Modal review flows
 - Activity feed
 - Compare and decision brief views
+- Supplier details and intelligence views
 
 ### Backend
 
@@ -46,12 +47,13 @@ BidWire keeps those records connected to the project.
 ### AI / extraction
 
 - OpenAI structured outputs for BOQ/procurement drafting and supplier quote extraction
+- Firecrawl Agent for evidence-backed supplier research
 - PDF.js for PDF text extraction inside the Convex Node runtime
 - Deterministic unit conversion for known units
 
 ### External services
 
-- Firecrawl for supplier discovery
+- Firecrawl for supplier discovery and website intelligence
 - AgentMail for project inboxes, outbound messages and inbound webhooks
 
 ---
@@ -83,25 +85,49 @@ Firecrawl-backed discovery is category-aware. The goal is to return suppliers re
 
 Demo suppliers exist for repeatable hackathon testing.
 
-### 4.4 Supplier selection and identity
+### 4.4 Supplier web intelligence
 
-Suppliers have a source (`firecrawl`, `manual` or `demo`), categories, email and status.
+The Suppliers workflow now goes beyond discovery. A supplier can be researched against the actual project context.
+
+Research receives:
+
+- project location
+- project name
+- current BOQ items and categories
+- supplier name
+- supplier website when available
+
+The Firecrawl research prompt explicitly asks for evidence rather than invented facts. It checks:
+
+- actual business location
+- relevance to requested materials/categories
+- public contact routes
+- source URLs and reasons
+- publicly listed prices where available
+
+Research results are stored with the supplier as review evidence. Location/category verification is represented explicitly so an unverified supplier is not silently treated as confirmed.
+
+Supplier websites can also be mapped and crawled. The application stores discovered URLs and crawl metadata so the website can be revisited without turning web observations into commercial quotes.
+
+### 4.5 Supplier selection and identity
+
+Suppliers have a source (`firecrawl`, `manual` or `demo`), categories, email, optional phone and status.
 
 The project's AgentMail inbox is separate from supplier recipient addresses. Demo mode can restrict outbound recipients through an allowlist.
 
-### 4.5 RFQ drafting
+### 4.6 RFQ drafting
 
 BidWire generates one draft per selected supplier. The draft records the exact line-item IDs included in that supplier's RFQ.
 
 This is important because a material removed from the active RFQ scope must not later become an award requirement simply because it still exists in the broader project materials list.
 
-### 4.6 RFQ sending
+### 4.7 RFQ sending
 
 The user reviews/approves the draft. BidWire sends through the project's AgentMail inbox and creates a project/supplier thread and outbound message record.
 
 Events record the RFQ send operation.
 
-### 4.7 AgentMail inbound loop
+### 4.8 AgentMail inbound loop
 
 The intended loop is:
 
@@ -111,7 +137,7 @@ The webhook route is `/agentmail/webhook`.
 
 The inbound pipeline resolves the project and supplier from the email/thread context before storing the message.
 
-### 4.8 Quote extraction
+### 4.9 Quote extraction
 
 Supplier replies can contain plain text, tables and PDF quotations. The extraction pipeline first classifies the response and then, for quote/partial-quote responses, extracts structured quote data.
 
@@ -131,13 +157,13 @@ Extracted fields include:
 
 The LLM does not control project/supplier/message identity. Those IDs come from the application context.
 
-### 4.9 Needs Review and deterministic normalization
+### 4.10 Needs Review and deterministic normalization
 
 Low-confidence quote matches are left unmatched and surfaced for review. A user can manually confirm a quote line against a project line item.
 
 Known conversions such as tonne/kg, kg/g, litre/ml and metre/cm are handled by deterministic code. Unknown unit mismatches remain visible instead of being silently converted.
 
-### 4.10 Compare
+### 4.11 Compare
 
 The comparison view shows supplier coverage and prices together. It supports:
 
@@ -147,23 +173,24 @@ The comparison view shows supplier coverage and prices together. It supports:
 - missing items
 - quote revisions
 - confidence warnings
-- decision brief
+- published web-price observations
+- decision brief / download view
 
-A revision is detected when a later quote version changes the price for an item.
+A revision is detected when a later quote version changes the price for an item. Published website prices remain observations and are never silently promoted to supplier quotes.
 
-### 4.11 Follow-ups
+### 4.12 Follow-ups
 
 Non-responding supplier threads can schedule follow-up checks. The project can optionally auto-approve follow-ups, and the system caps repeated nudges.
 
 Cancelling a project cancels pending follow-up schedules.
 
-### 4.12 Negotiation
+### 4.13 Negotiation
 
 Negotiation can be initiated from supplier/quote context. BidWire generates an editable counter/negotiation draft. The draft is reviewed in a modal and must be approved before sending.
 
 Negotiation is disabled after award.
 
-### 4.13 Award validation
+### 4.14 Award validation
 
 Awarding supports single-supplier and split modes. The backend derives the relevant RFQ scope and verifies that every item being awarded has a valid current quote.
 
@@ -176,8 +203,10 @@ After award:
 - award events are recorded
 - pending RFQ drafts are discarded
 - negotiation is disabled
+- supplier discovery is disabled
+- material removal is disabled
 
-### 4.14 Award communication
+### 4.15 Award communication
 
 Award generation prepares purchase-order and supplier-notification drafts. The user reviews the message in a modal, can edit it and explicitly chooses **Approve & send**.
 
@@ -201,6 +230,16 @@ Signals include:
 - negotiation prompts
 
 The UI explicitly describes these as review signals rather than automatic supplier recommendations.
+
+Supplier web research is a separate evidence layer. It can add:
+
+- verified/unverified research status
+- business location evidence
+- requested-category evidence
+- source URLs
+- public-price observations
+- mapped website URLs
+- crawl metadata
 
 ---
 
@@ -264,6 +303,7 @@ When there is insufficient evidence, the UI says so.
 
 - BOQ content
 - supplier discovery assistance
+- supplier web research
 - quote extraction
 - RFQ drafts
 - follow-up drafts
@@ -287,7 +327,7 @@ When there is insufficient evidence, the UI says so.
 - negotiation approval
 - final award communication
 
-Inbound supplier email is treated as untrusted data. Structured extraction cannot directly choose another tenant/project's IDs.
+Inbound supplier email and public web content are treated as untrusted data. Structured extraction cannot directly choose another tenant/project's IDs.
 
 ---
 
@@ -298,18 +338,20 @@ A strong demo should show the full loop rather than isolated AI features:
 1. Create a real-world project.
 2. Generate and review materials.
 3. Discover relevant suppliers.
-4. Select suppliers.
-5. Generate RFQs and show the exact scope in each draft.
-6. Approve and send RFQs through AgentMail.
-7. Reply from supplier inboxes.
-8. Show the replies entering the BidWire Inbox.
-9. Show extracted quotes in Compare.
-10. Show a missing/low-confidence quote line in Needs Review.
-11. Open the negotiation modal and edit the generated message.
-12. Show award readiness validation.
-13. Award the project.
-14. Review the generated award communication and explicitly approve sending.
-15. Open Insights and show the procurement memory layer.
+4. Research a supplier and inspect its evidence.
+5. Map/crawl a supplier website.
+6. Select suppliers.
+7. Generate RFQs and show the exact scope in each draft.
+8. Approve and send RFQs through AgentMail.
+9. Reply from supplier inboxes.
+10. Show the replies entering the BidWire Inbox.
+11. Show extracted quotes in Compare.
+12. Show a missing/low-confidence quote line in Needs Review.
+13. Open the negotiation modal and edit the generated message.
+14. Show award readiness validation.
+15. Award the project.
+16. Review the generated award communication and explicitly approve sending.
+17. Open Insights and show the procurement memory layer.
 
 ---
 
@@ -356,10 +398,12 @@ https://<public-host>/agentmail/webhook
 
 not merely the ngrok root.
 
+For supplier research, Firecrawl API credentials must also be available to the Convex deployment. Supplier web research uses the project's location and current BOQ context so the research prompt is grounded in the actual procurement job.
+
 ---
 
 ## 12. Current implementation status
 
-The current build includes the complete core procurement loop plus supplier intelligence, award communication review, historical workspace insights and operational action visibility.
+The current build includes the complete core procurement loop plus supplier web intelligence, evidence-backed supplier review, award communication review, historical workspace insights and operational action visibility.
 
 The goal of the Then phase is not to add speculative features for the sake of a larger feature list. It is to make the data already collected by BidWire useful across projects while preserving the previously working procurement flow.
