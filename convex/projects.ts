@@ -1,5 +1,5 @@
-import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { requireProjectOwner, requireUserId } from "./lib/auth";
 import type { Id } from "./_generated/dataModel";
@@ -28,6 +28,8 @@ const projectFields = {
   attachmentIds: v.optional(v.array(v.id("_storage"))),
   autoApproveFollowUps: v.optional(v.boolean()),
   createdAt: v.number(),
+  awardId: v.optional(v.id("awards")),
+  awardedAt: v.optional(v.number()),
 };
 
 export const createProject = mutation({
