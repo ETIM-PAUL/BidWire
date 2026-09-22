@@ -8,6 +8,7 @@ import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
 const app = defineApp({
   env: {
     FIRECRAWL_API_KEY: v.string(),
+    AGENTMAIL_API_KEY: v.string(),
   },
 });
 
@@ -18,6 +19,10 @@ app.use(firecrawl, {
 });
 app.use(rateLimiter);
 app.use(actionRetrier);
-app.use(agentmail);
+app.use(agentmail, {
+  env: {
+    AGENTMAIL_API_KEY: app.env.AGENTMAIL_API_KEY,
+  },
+});
 
 export default app;

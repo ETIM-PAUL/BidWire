@@ -68,7 +68,10 @@ export const onMessageReceived = internalMutation({
     }
 
     const providerThreadId = getStringField(args.message, "thread_id");
-    const fromAddress = getStringField(args.message, "from")?.trim().toLowerCase();
+    const rawFrom = getStringField(args.message, "from")?.trim() ?? "";
+    const fromAddress =
+    rawFrom.match(/<([^>]+)>/)?.[1]?.trim().toLowerCase() ??
+    rawFrom.toLowerCase();
     const subject = getStringField(args.message, "subject") ?? "";
 
     // Demo mode may reuse one AgentMail inbox across multiple projects.

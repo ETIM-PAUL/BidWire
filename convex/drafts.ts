@@ -111,19 +111,22 @@ export const sendRfq = mutation({
     if (!supplier) {
       throw new Error("Supplier not found");
     }
-    const supplierEmail =
-      supplier.email ??
-      (process.env.DEMO_MODE === "true"
-        ? process.env.DEMO_ALLOWLIST?.split(",").map((value) => value.trim()).filter(Boolean)[0]
-        : undefined);
-    if (!supplierEmail) {
-      throw new Error(
-        "Supplier has no email on file. In demo mode, configure DEMO_ALLOWLIST or provision a demo inbox first.",
-      );
-    }
     const project = await ctx.db.get(draft.projectId);
     if (!project) {
       throw new Error("Project not found");
+    }
+    // Existing demo projects may have been created before the shared-inbox
+    // fix, so their supplier rows can still have no email. Keep the demo send
+    // path self-contained by using the project's controlled AgentMail inbox
+    // as the recipient until the supplier row is repaired.
+    const supplierEmail =
+      supplier.email ??
+      (process.env.DEMO_MODE === "true"
+        ? process.env.DEMO_ALLOWLIST?.split(",").map((value) => value.trim()).filter(Boolean)[0] ??
+          project.inboxAddress
+        : undefined);
+    if (!supplierEmail) {
+      throw new Error("Supplier has no email on file");
     }
     if (!project.inboxId) {
       throw new Error("Project has no inbox yet - provision one first");
