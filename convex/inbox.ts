@@ -20,7 +20,7 @@ export const provisionInbox=action({
       const configured=(process.env.DEMO_ALLOWLIST??"").split(",").map(x=>x.trim()).filter(Boolean).filter(x=>x.toLowerCase()!==inbox.email.toLowerCase());
       const availableSupplierEmails=available.map(x=>x.email).filter(x=>x.toLowerCase()!==inbox.email.toLowerCase());
       const pool=configured.length?configured:availableSupplierEmails;
-      await ctx.runMutation(internal.suppliers.assignDemoSupplierEmails,{projectId:args.projectId,emails:pool,projectInboxEmail:inbox.email});
+      await ctx.runMutation(internal.suppliers.assignDemoSupplierEmails,{projectId:args.projectId,emails:pool});
     }
     return null;
   }
