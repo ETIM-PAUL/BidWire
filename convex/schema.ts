@@ -2,11 +2,26 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const supplierResearchSource = v.object({ url: v.string(), title: v.optional(v.string()), reason: v.optional(v.string()) });
+const webChange = v.object({ detectedAt: v.number(), summary: v.string(), url: v.string() });
+
 export default defineSchema({
   ...authTables,
   projects: defineTable({ ownerId: v.id("users"), name: v.string(), jobDescription: v.string(), location: v.string(), currency: v.string(), status: v.union(v.literal("draft"), v.literal("boq_ready"), v.literal("sourcing"), v.literal("rfq_sent"), v.literal("comparing"), v.literal("awarded"), v.literal("cancelled")), inboxId: v.optional(v.string()), inboxAddress: v.optional(v.string()), attachmentIds: v.optional(v.array(v.id("_storage"))), autoApproveFollowUps: v.optional(v.boolean()), createdAt: v.number(), awardId: v.optional(v.id("awards")), awardedAt: v.optional(v.number()) }).index("by_owner", ["ownerId"]).index("by_inbox_id", ["inboxId"]),
   lineItems: defineTable({ projectId: v.id("projects"), name: v.string(), spec: v.string(), quantity: v.number(), unit: v.string(), category: v.string(), sortOrder: v.number() }).index("by_project", ["projectId"]),
-  suppliers: defineTable({ projectId: v.id("projects"), name: v.string(), website: v.optional(v.string()), email: v.optional(v.string()), source: v.union(v.literal("firecrawl"), v.literal("manual"), v.literal("demo")), categories: v.array(v.string()), listPrices: v.optional(v.array(v.object({ itemHint: v.string(), price: v.number(), unit: v.string() }))), status: v.union(v.literal("candidate"), v.literal("selected"), v.literal("rfq_sent"), v.literal("replied"), v.literal("declined"), v.literal("silent")) }).index("by_project", ["projectId"]),
+  suppliers: defineTable({
+    projectId: v.id("projects"), name: v.string(), website: v.optional(v.string()), email: v.optional(v.string()), phone: v.optional(v.string()),
+    source: v.union(v.literal("firecrawl"), v.literal("manual"), v.literal("demo")), categories: v.array(v.string()),
+    listPrices: v.optional(v.array(v.object({ itemHint: v.string(), price: v.number(), unit: v.string() }))),
+    status: v.union(v.literal("candidate"), v.literal("selected"), v.literal("rfq_sent"), v.literal("replied"), v.literal("declined"), v.literal("silent")),
+    researchStatus: v.optional(v.union(v.literal("idle"), v.literal("researching"), v.literal("verified"), v.literal("needs_review"), v.literal("failed"))),
+    researchedAt: v.optional(v.number()), researchLocation: v.optional(v.string()), researchLocationVerified: v.optional(v.boolean()),
+    researchCategories: v.optional(v.array(v.string())), researchReasons: v.optional(v.array(v.string())), researchEvidence: v.optional(v.array(v.string())),
+    researchSources: v.optional(v.array(supplierResearchSource)), researchSourceCount: v.optional(v.number()), researchUrls: v.optional(v.array(v.string())),
+    mapUrls: v.optional(v.array(v.string())), crawlId: v.optional(v.string()), lastCrawlAt: v.optional(v.number()),
+    monitoringEnabled: v.optional(v.boolean()), lastMonitoredAt: v.optional(v.number()), lastWebChangeAt: v.optional(v.number()), lastWebChangeSummary: v.optional(v.string()),
+    webChangeHistory: v.optional(v.array(webChange)),
+  }).index("by_project", ["projectId"]),
   threads: defineTable({ projectId: v.id("projects"), supplierId: v.id("suppliers"), providerThreadId: v.string(), lastMessageAt: v.number(), followUpsSent: v.number(), pendingFollowUpScheduledId: v.optional(v.id("_scheduled_functions")) }).index("by_project", ["projectId"]).index("by_supplier", ["supplierId"]).index("by_provider_thread_id", ["providerThreadId"]),
   messages: defineTable({ threadId: v.optional(v.id("threads")), projectId: v.id("projects"), supplierId: v.optional(v.id("suppliers")), providerMessageId: v.string(), direction: v.union(v.literal("out"), v.literal("in")), subject: v.string(), bodyText: v.string(), attachmentIds: v.array(v.id("_storage")), receivedAt: v.number(), processed: v.boolean() }).index("by_project", ["projectId"]).index("by_thread", ["threadId"]).index("by_supplier", ["supplierId"]).index("by_provider_message_id", ["providerMessageId"]),
   quotes: defineTable({ projectId: v.id("projects"), supplierId: v.id("suppliers"), messageId: v.id("messages"), validUntil: v.optional(v.number()), leadTimeDays: v.optional(v.number()), deliveryCost: v.optional(v.number()), currency: v.string(), confidence: v.number(), notes: v.optional(v.string()), version: v.number() }).index("by_project", ["projectId"]).index("by_supplier", ["supplierId"]).index("by_message", ["messageId"]).index("by_valid_until", ["validUntil"]),
