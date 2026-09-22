@@ -4,6 +4,21 @@ import { requireUserId } from "./lib/auth";
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
 
+type PriceGroup = {
+  itemName: string;
+  unit: string;
+  currency: string;
+  prices: number[];
+  latest: number;
+  previous?: number;
+  latestAt: number;
+};
+
+type LeadGroup = {
+  name: string;
+  values: Array<{ days: number; at: number }>;
+};
+
 export const workspaceInsights = query({
   args: {},
   returns: v.object({
@@ -44,17 +59,24 @@ export const workspaceInsights = query({
     const spendByProject = projects.map(p => ({ projectId: p._id, projectName: p.name, status: p.status, spend: allAwards.filter(a => a.projectId === p._id).reduce((sum, a) => sum + a.totalSpend, 0), currency: p.currency })).filter(p => p.spend > 0).sort((a, b) => b.spend - a.spend).slice(0, 8);
     const lineNames = new Map(allLineItems.map(i => [i._id as string, i]));
     const quotesById = new Map(allQuotes.map(q => [q._id as string, q]));
-    const grouped = new Map<string, { itemName: string; unit: string; currency: string; prices: number[]; latest: number; previous?: number; latestAt: number }>();
+    const grouped = new Map<string, PriceGroup>();
     for (const line of allQuoteLines) {
       if (!line.lineItemId) continue;
       const item = lineNames.get(line.lineItemId as string);
       const quote = quotesById.get(line.quoteId as string);
       if (!item || !quote) continue;
       const key = `${normalize(item.name)}|${normalize(line.unit)}|${quote.currency}`;
-      const current = grouped.get(key) ?? { itemName: item.name, unit: line.unit, currency: quote.currency, prices: [], latest: line.unitPrice, latestAt: 0 };
+      let current = grouped.get(key);
+      if (!current) {
+        current = { itemName: item.name, unit: line.unit, currency: quote.currency, prices: [], latest: line.unitPrice, latestAt: 0 };
+        grouped.set(key, current);
+      }
       current.prices.push(line.unitPrice);
-      if (quote._creationTime >= current.latestAt) { current.previous = current.latestAt === 0 ? undefined : current.latest; current.latest = line.unitPrice; current.latestAt = quote._creationTime; }
-      grouped.set(key, current);
+      if (quote._creationTime >= current.latestAt) {
+        current.previous = current.latestAt === 0 ? undefined : current.latest;
+        current.latest = line.unitPrice;
+        current.latestAt = quote._creationTime;
+      }
     }
     const priceSignals = [...grouped.values()].filter(g => g.prices.length >= 2).map(g => ({
       itemName: g.itemName, observations: g.prices.length, averageUnitPrice: g.prices.reduce((a, b) => a + b, 0) / g.prices.length, lowestUnitPrice: Math.min(...g.prices), highestUnitPrice: Math.max(...g.prices), latestUnitPrice: g.latest, previousUnitPrice: g.previous,
@@ -62,12 +84,16 @@ export const workspaceInsights = query({
       unit: g.unit, currency: g.currency,
     })).sort((a, b) => b.observations - a.observations).slice(0, 12);
     const supplierById = new Map(allSuppliers.map(s => [s._id as string, s]));
-    const leadGroups = new Map<string, { name: string; values: { days: number; at: number }[] }>();
+    const leadGroups = new Map<string, LeadGroup>();
     for (const quote of allQuotes) {
       if (quote.leadTimeDays === undefined) continue;
       const supplier = supplierById.get(quote.supplierId as string); if (!supplier) continue;
-      const current = leadGroups.get(quote.supplierId as string) ?? { name: supplier.name, values: [] };
-      current.values.push({ days: quote.leadTimeDays, at: quote._creationTime }); leadGroups.set(quote.supplierId as string, current);
+      let current = leadGroups.get(quote.supplierId as string);
+      if (!current) {
+        current = { name: supplier.name, values: [] };
+        leadGroups.set(quote.supplierId as string, current);
+      }
+      current.values.push({ days: quote.leadTimeDays, at: quote._creationTime });
     }
     const leadTimeSignals = [...leadGroups.values()].filter(g => g.values.length >= 2).map(g => { const values = [...g.values].sort((a, b) => a.at - b.at); const latest = values[values.length - 1].days; const previous = values[values.length - 2]?.days; return { supplierName: g.name, observations: values.length, latestDays: latest, previousDays: previous, direction: previous === undefined || latest === previous ? "stable" as const : latest > previous ? "up" as const : "down" as const }; }).slice(0, 12);
     const pendingFollowUps = allDrafts.filter(d => d.kind === "follow_up" && d.status === "pending").length;
