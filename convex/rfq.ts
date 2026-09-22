@@ -8,7 +8,7 @@ function replyByDate(): string { return new Date(Date.now()+5*24*60*60*1000).toL
 function norm(s:string):string { return s.trim().toLowerCase(); }
 function buildBody(projectName:string, location:string, supplierName:string, deadline:string, items:Array<{name:string;spec:string;quantity:number;unit:string}>):string {
   const rows=items.map(i=>`- ${i.quantity} ${i.unit}: ${i.name} — ${i.spec}`).join("\n");
-  return [`Dear ${supplierName},","",`Please provide a quotation for the following materials for ${projectName}. Delivery location: ${location}.`,"","Items required:",rows,"","For each item, please provide:","- Unit price","- Available quantity / confirmation of quantity","- Lead time","- Delivery cost","",`Please reply by ${deadline}.`,"",`Kind regards,\nBidWire — ${projectName}`].join("\n");
+  return [`Dear ${supplierName},`,"",`Please provide a quotation for the following materials for ${projectName}. Delivery location: ${location}.`,"","Items required:",rows,"","For each item, please provide:","- Unit price","- Available quantity / confirmation of quantity","- Lead time","- Delivery cost","",`Please reply by ${deadline}.`,"",`Kind regards,\nBidWire — ${projectName}`].join("\n");
 }
 
 export const draftRfqs = action({
