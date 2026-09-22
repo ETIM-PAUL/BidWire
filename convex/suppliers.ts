@@ -41,7 +41,6 @@ export const listSuppliers = query({
   handler: async (ctx, args) => { await requireProjectOwner(ctx, args.projectId); return ctx.db.query("suppliers").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500); },
 });
 
-// Public helper used by supplier intelligence actions to resolve and authorize a supplier's project.
 export const getSupplierProjectId = query({
   args: { supplierId: v.id("suppliers") }, returns: v.union(v.object({ projectId: v.id("projects") }), v.null()),
   handler: async (ctx, args) => { const supplier = await ctx.db.get(args.supplierId); if (!supplier) return null; await requireProjectOwner(ctx, supplier.projectId); return { projectId: supplier.projectId }; },
@@ -77,7 +76,7 @@ export const insertDiscoveredSupplier = internalMutation({
   },
 });
 
-function extractDomain(url: string): string { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } }
+function extractDomain(url: string): string { try { return new URL(url).hostname.replace(/^www\\./, ""); } catch { return url; } }
 
 async function getOwnedSupplier(ctx: any, supplierId: any) {
   const project = await ctx.runQuery(api.suppliers.getSupplierProjectId, { supplierId });
@@ -88,25 +87,57 @@ async function getOwnedSupplier(ctx: any, supplierId: any) {
   return supplier;
 }
 
-async function firecrawlRequest(url: string, operation: "research" | "map" | "crawl") {
+async function firecrawlRequest(ctx: any, url: string, operation: "research" | "map") {
   const client = new FirecrawlClient(components.firecrawl);
   if (operation === "research") {
-    const page = await client.scrape(url, { formats: ["markdown"] });
+    const page = await client.scrape(ctx, url, { formats: ["markdown"] });
     return { operation, url, title: page.metadata?.title ?? null, description: page.metadata?.description ?? null, markdown: (page.markdown ?? "").slice(0, 30000), links: Array.isArray(page.links) ? page.links.slice(0, 100) : [] };
   }
-  if (operation === "map") {
-    const result = await client.map(url, { limit: 100 });
-    return { operation, url, links: Array.isArray(result.links) ? result.links : [] };
-  }
-  const result = await client.crawl(url, { limit: 20, scrapeOptions: { formats: ["markdown"] } });
-  return { operation, url, status: result.status ?? "completed", total: result.total ?? result.data?.length ?? 0, completed: result.completed ?? result.data?.length ?? 0, pages: (result.data ?? []).slice(0, 20).map((page: any) => ({ url: page.metadata?.sourceURL ?? page.url ?? null, title: page.metadata?.title ?? null, markdown: (page.markdown ?? "").slice(0, 6000) })) };
+  const result = await client.map(ctx, url, { limit: 100 });
+  return { operation, url, links: Array.isArray(result.links) ? result.links : [] };
 }
 
-// These four public actions were missing from the deployed suppliers module. Keep the results ephemeral so website research does not silently become supplier facts.
-export const researchSupplier = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to research."); return firecrawlRequest(supplier.website, "research"); } });
-export const mapSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to map."); return firecrawlRequest(supplier.website, "map"); } });
-export const crawlSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to crawl."); return firecrawlRequest(supplier.website, "crawl"); } });
-export const refreshSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); const url = supplier.website; if (!url) throw new Error("Supplier has no website to refresh."); return { ...(await firecrawlRequest(url, "research")), refreshedAt: Date.now() }; } });
+export const researchSupplier = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.any(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+    if (!supplier.website) throw new Error("Supplier has no website to research.");
+    return firecrawlRequest(ctx, supplier.website, "research");
+  },
+});
+
+export const mapSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.any(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+    if (!supplier.website) throw new Error("Supplier has no website to map.");
+    return firecrawlRequest(ctx, supplier.website, "map");
+  },
+});
+
+export const crawlSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.any(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+    if (!supplier.website) throw new Error("Supplier has no website to crawl.");
+    const firecrawl = new FirecrawlClient(components.firecrawl);
+    // Poll mode works in local Convex development without requiring Firecrawl to reach a public webhook.
+    return await firecrawl.startCrawl(ctx, {
+      url: supplier.website,
+      mode: "poll",
+      options: { limit: 20, scrapeOptions: { formats: ["markdown"] } },
+    });
+  },
+});
+
+export const refreshSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.any(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+    if (!supplier.website) throw new Error("Supplier has no website to refresh.");
+    return { ...(await firecrawlRequest(ctx, supplier.website, "research")), refreshedAt: Date.now() };
+  },
+});
 
 export const simulatorReplies = action({
   args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("pdf_quote"), v.literal("decline"), v.literal("revised_price")) }, returns: v.null(),
