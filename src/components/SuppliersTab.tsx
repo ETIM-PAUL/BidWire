@@ -8,37 +8,252 @@ import { RfqDrafts } from './RfqDrafts'
 import { SupplierIntelligence } from './SupplierIntelligence'
 import { Skeleton } from './ui'
 
-const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = { firecrawl: 'bg-blue-950 text-blue-300 border-blue-900', demo: 'bg-emerald-950 text-emerald-300 border-emerald-900', manual: 'bg-neutral-800 text-neutral-300 border-neutral-700' }
+const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = {
+  firecrawl: 'bg-blue-950 text-blue-300 border-blue-900',
+  demo: 'bg-emerald-950 text-emerald-300 border-emerald-900',
+  manual: 'bg-neutral-800 text-neutral-300 border-neutral-700',
+}
+
+type WebsiteAction = 'research' | 'map' | 'crawl' | 'refresh'
+
+const WEBSITE_ACTION_LABELS: Record<WebsiteAction, string> = {
+  research: 'Research Supplier',
+  map: 'Map Site',
+  crawl: 'Crawl Site',
+  refresh: 'Refresh Supplier',
+}
 
 export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
   const suppliers = useQuery(api.suppliers.listSuppliers, { projectId: project._id })
   const matrix = useQuery(api.comparison.comparisonMatrix, { projectId: project._id })
   const config = useQuery(api.suppliers.getPublicConfig)
   const discoverSuppliers = useAction(api.discovery.discoverSuppliers)
+  const researchSupplier = useAction(api.suppliers.researchSupplier)
+  const mapSupplierWebsite = useAction(api.suppliers.mapSupplierWebsite)
+  const crawlSupplierWebsite = useAction(api.suppliers.crawlSupplierWebsite)
+  const refreshSupplierWebsite = useAction(api.suppliers.refreshSupplierWebsite)
   const toggleSelected = useMutation(api.suppliers.toggleSupplierSelected)
   const setAutoApprove = useMutation(api.followups.setAutoApproveFollowUps)
+
   const [discovering, setDiscovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [websiteBusy, setWebsiteBusy] = useState<{ supplierId: Id<'suppliers'>; action: WebsiteAction } | null>(null)
+  const [websiteError, setWebsiteError] = useState<string | null>(null)
+  const [websiteSuccess, setWebsiteSuccess] = useState<string | null>(null)
   const [openNegotiationDraftId, setOpenNegotiationDraftId] = useState<Id<'drafts'> | null>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<Doc<'suppliers'> | null>(null)
 
-  async function handleDiscover() { setError(null); setDiscovering(true); try { await discoverSuppliers({ projectId: project._id }) } catch (error) { setError(error instanceof Error ? error.message : 'Could not run supplier discovery. Try again.') } finally { setDiscovering(false) } }
+  async function handleDiscover() {
+    setError(null)
+    setDiscovering(true)
+    try {
+      await discoverSuppliers({ projectId: project._id })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not run supplier discovery. Try again.')
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
+  async function handleWebsiteAction(supplier: Doc<'suppliers'>, actionName: WebsiteAction) {
+    if (!supplier.website || websiteBusy) return
+
+    setWebsiteError(null)
+    setWebsiteSuccess(null)
+    setWebsiteBusy({ supplierId: supplier._id, action: actionName })
+
+    try {
+      if (actionName === 'research') {
+        await researchSupplier({ supplierId: supplier._id })
+      } else if (actionName === 'map') {
+        await mapSupplierWebsite({ supplierId: supplier._id })
+      } else if (actionName === 'crawl') {
+        await crawlSupplierWebsite({ supplierId: supplier._id })
+      } else {
+        await refreshSupplierWebsite({ supplierId: supplier._id })
+      }
+      setWebsiteSuccess(`${WEBSITE_ACTION_LABELS[actionName]} completed for ${supplier.name}.`)
+    } catch (error) {
+      setWebsiteError(error instanceof Error ? error.message : `Could not ${WEBSITE_ACTION_LABELS[actionName].toLowerCase()}.`)
+    } finally {
+      setWebsiteBusy(null)
+    }
+  }
+
   const coverageBySupplier = new Map((matrix?.columns ?? []).map((column) => [column.supplierId, column]))
 
-  return <div className="space-y-4">
-    <div className="flex items-center justify-between"><div><h3 className="text-sm font-medium text-neutral-300">Suppliers {suppliers ? `(${suppliers.length})` : ''}</h3>{config?.demoMode && <p className="text-xs text-amber-500 mt-0.5">Demo mode: only demo suppliers can be selected for an RFQ.</p>}</div><button onClick={() => void handleDiscover()} disabled={discovering || project.status === 'awarded'} title={project.status === 'awarded' ? 'Supplier discovery is disabled after award' : undefined} className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">{discovering ? 'Discovering…' : project.status === 'awarded' ? 'Discovery closed' : 'Discover suppliers'}</button></div>
-    {error && <p className="text-sm text-red-400">{error}</p>}
-    <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer w-fit"><input type="checkbox" checked={project.autoApproveFollowUps ?? false} onChange={(e) => void setAutoApprove({ projectId: project._id, enabled: e.currentTarget.checked })} />Auto-approve follow-up nudges to non-responding suppliers</label>
-    {suppliers === undefined ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"><Skeleton className="h-48"/><Skeleton className="h-48"/><Skeleton className="h-48"/></div> : suppliers.length === 0 ? <div className="rounded-lg border border-neutral-800 p-6 text-center"><p className="text-sm text-neutral-400">No suppliers yet. Generate a materials list first, then discover suppliers by category.</p></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{suppliers.map((s) => {
-      const locked = config?.demoMode === true && s.source !== 'demo'; const negotiationDisabled = project.status === 'awarded'; const intelligence = coverageBySupplier.get(s._id)
-      return <button key={s._id} type="button" onClick={() => setSelectedSupplier(s)} className="rounded-lg border border-neutral-800 p-4 space-y-2 text-left hover:border-neutral-600 hover:bg-white/[.015] transition"><div className="flex items-start justify-between gap-2"><span className="font-medium text-sm">{s.name}</span><span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${SOURCE_BADGE[s.source]}`}>{s.source}</span></div>{s.website && <span className="block text-xs text-neutral-500 truncate">{s.website}</span>}<p className="text-xs text-neutral-500 truncate">{s.email ?? 'N/A'}</p><div className="flex flex-wrap gap-1">{s.categories.slice(0, 5).map((c) => <span key={c} className="rounded bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400">{c}</span>)}</div>{intelligence && <div className="mt-3 grid grid-cols-3 gap-2 border-t border-neutral-900 pt-3"><div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Coverage</p><p className="mt-1 text-xs font-medium text-neutral-300">{intelligence.coveragePercent}%</p></div><div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Version</p><p className="mt-1 text-xs font-medium text-neutral-300">v{intelligence.quoteVersion}</p></div><div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Missing</p><p className="mt-1 text-xs font-medium text-neutral-300">{intelligence.missingLineItemIds.length}</p></div></div>}{intelligence && intelligence.coveragePercent < 100 && <p className="rounded-md border border-amber-900/50 bg-amber-950/20 px-2 py-1.5 text-[11px] leading-4 text-amber-400">Quote does not cover the full current scope. Review missing items before award.</p>}{s.listPrices && s.listPrices.length > 0 && <div className="text-xs text-neutral-500 space-y-0.5 pt-1 border-t border-neutral-900"><p className="text-neutral-600">Published prices</p>{s.listPrices.slice(0, 3).map((lp, i) => <p key={i} className="truncate">{lp.itemHint}: {lp.price}/{lp.unit}</p>)}</div>}{s.status === 'replied' && <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}><NegotiateButton projectId={project._id} supplierId={s._id} disabled={negotiationDisabled} onDraftReady={setOpenNegotiationDraftId}/>{negotiationDisabled && <span className="text-[10px] text-neutral-600">Awarded</span>}</div>}<span className="pt-2 text-[11px] text-neutral-600">Click for supplier details →</span><label className={`flex items-center gap-2 pt-2 text-xs ${locked ? 'text-neutral-600' : 'text-neutral-300 cursor-pointer'}`} onClick={e => e.stopPropagation()} title={locked ? "Demo mode: real suppliers can't be selected for sending" : undefined}><input type="checkbox" checked={s.status === 'selected'} disabled={locked || project.status === 'awarded'} onChange={() => void toggleSelected({ supplierId: s._id })} className="disabled:cursor-not-allowed" />Select for RFQ</label></button>
-    })}</div>}
-    <SupplierIntelligence project={project} />
-    <RfqDrafts project={project} /><FollowUpDrafts project={project} /><NegotiationDrafts project={project} openDraftId={openNegotiationDraftId} onClose={() => setOpenNegotiationDraftId(null)} />
-    {selectedSupplier && <SupplierModal supplier={selectedSupplier} intelligence={coverageBySupplier.get(selectedSupplier._id)} onClose={() => setSelectedSupplier(null)} />}
-  </div>
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-medium text-neutral-300">Suppliers {suppliers ? `(${suppliers.length})` : ''}</h3>
+          {config?.demoMode && <p className="text-xs text-amber-500 mt-0.5">Demo mode: only demo suppliers can be selected for an RFQ.</p>}
+        </div>
+        <button
+          onClick={() => void handleDiscover()}
+          disabled={discovering || project.status === 'awarded'}
+          title={project.status === 'awarded' ? 'Supplier discovery is disabled after award' : undefined}
+          className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {discovering ? 'Discovering…' : project.status === 'awarded' ? 'Discovery closed' : 'Discover suppliers'}
+        </button>
+      </div>
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <label className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer w-fit">
+        <input
+          type="checkbox"
+          checked={project.autoApproveFollowUps ?? false}
+          onChange={(e) => void setAutoApprove({ projectId: project._id, enabled: e.currentTarget.checked })}
+        />
+        Auto-approve follow-up nudges to non-responding suppliers
+      </label>
+
+      {suppliers === undefined ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+      ) : suppliers.length === 0 ? (
+        <div className="rounded-lg border border-neutral-800 p-6 text-center">
+          <p className="text-sm text-neutral-400">No suppliers yet. Generate a materials list first, then discover suppliers by category.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {suppliers.map((s) => {
+            const locked = config?.demoMode === true && s.source !== 'demo'
+            const negotiationDisabled = project.status === 'awarded'
+            const intelligence = coverageBySupplier.get(s._id)
+            const isWebsiteBusy = websiteBusy?.supplierId === s._id
+
+            return (
+              <div
+                key={s._id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedSupplier(s)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setSelectedSupplier(s)
+                  }
+                }}
+                className="rounded-lg border border-neutral-800 p-4 space-y-2 text-left hover:border-neutral-600 hover:bg-white/[.015] transition cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-600"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-sm">{s.name}</span>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${SOURCE_BADGE[s.source]}`}>{s.source}</span>
+                </div>
+
+                <p className="text-xs text-neutral-500 truncate">{s.website ?? 'N/A'}</p>
+                <p className="text-xs text-neutral-500 truncate">{s.email ?? 'N/A'}</p>
+
+                <div className="flex flex-wrap gap-1">
+                  {s.categories.slice(0, 5).map((category) => (
+                    <span key={category} className="rounded bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400">{category}</span>
+                  ))}
+                </div>
+
+                {intelligence && (
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-neutral-900 pt-3">
+                    <div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Coverage</p><p className="mt-1 text-xs font-medium text-neutral-300">{intelligence.coveragePercent}%</p></div>
+                    <div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Version</p><p className="mt-1 text-xs font-medium text-neutral-300">v{intelligence.quoteVersion}</p></div>
+                    <div><p className="text-[10px] uppercase tracking-wide text-neutral-700">Missing</p><p className="mt-1 text-xs font-medium text-neutral-300">{intelligence.missingLineItemIds.length}</p></div>
+                  </div>
+                )}
+
+                {intelligence && intelligence.coveragePercent < 100 && (
+                  <p className="rounded-md border border-amber-900/50 bg-amber-950/20 px-2 py-1.5 text-[11px] leading-4 text-amber-400">Quote does not cover the full current scope. Review missing items before award.</p>
+                )}
+
+                {s.listPrices && s.listPrices.length > 0 && (
+                  <div className="text-xs text-neutral-500 space-y-0.5 pt-1 border-t border-neutral-900">
+                    <p className="text-neutral-600">Published prices</p>
+                    {s.listPrices.slice(0, 3).map((lp, index) => <p key={index} className="truncate">{lp.itemHint}: {lp.price}/{lp.unit}</p>)}
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-neutral-900" onClick={(event) => event.stopPropagation()}>
+                  <p className="mb-2 text-[10px] uppercase tracking-wide text-neutral-600">Website intelligence</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(WEBSITE_ACTION_LABELS) as WebsiteAction[]).map((actionName) => {
+                      const disabled = !s.website || Boolean(websiteBusy)
+                      const active = isWebsiteBusy && websiteBusy?.action === actionName
+                      return (
+                        <button
+                          key={actionName}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => void handleWebsiteAction(s, actionName)}
+                          title={!s.website ? 'Supplier has no website' : WEBSITE_ACTION_LABELS[actionName]}
+                          className="rounded-md border border-neutral-800 px-2 py-1.5 text-[11px] text-neutral-300 hover:border-neutral-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer disabled:hover:border-neutral-800"
+                        >
+                          {active ? `${WEBSITE_ACTION_LABELS[actionName]}…` : WEBSITE_ACTION_LABELS[actionName]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {s.status === 'replied' && (
+                  <div className="flex items-center gap-2 pt-1" onClick={(event) => event.stopPropagation()}>
+                    <NegotiateButton projectId={project._id} supplierId={s._id} disabled={negotiationDisabled} onDraftReady={setOpenNegotiationDraftId} />
+                    {negotiationDisabled && <span className="text-[10px] text-neutral-600">Awarded</span>}
+                  </div>
+                )}
+
+                <span className="block pt-2 text-[11px] text-neutral-600">Click for supplier details →</span>
+
+                <label
+                  className={`flex items-center gap-2 pt-2 text-xs ${locked ? 'text-neutral-600' : 'text-neutral-300 cursor-pointer'}`}
+                  onClick={(event) => event.stopPropagation()}
+                  title={locked ? "Demo mode: real suppliers can't be selected for sending" : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={s.status === 'selected'}
+                    disabled={locked || project.status === 'awarded'}
+                    onChange={() => void toggleSelected({ supplierId: s._id })}
+                    className="disabled:cursor-not-allowed"
+                  />
+                  Select for RFQ
+                </label>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {websiteError && <p className="rounded-md border border-red-900/50 bg-red-950/20 px-3 py-2 text-xs text-red-300">{websiteError}</p>}
+      {websiteSuccess && <p className="rounded-md border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-300">{websiteSuccess}</p>}
+
+      <SupplierIntelligence project={project} />
+      <RfqDrafts project={project} />
+      <FollowUpDrafts project={project} />
+      <NegotiationDrafts project={project} openDraftId={openNegotiationDraftId} onClose={() => setOpenNegotiationDraftId(null)} />
+
+      {selectedSupplier && <SupplierModal supplier={selectedSupplier} intelligence={coverageBySupplier.get(selectedSupplier._id)} onClose={() => setSelectedSupplier(null)} />}
+    </div>
+  )
 }
 
 function SupplierModal({ supplier, intelligence, onClose }: { supplier: Doc<'suppliers'>; intelligence?: any; onClose: () => void }) {
-  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="presentation" onMouseDown={onClose}><div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0e0c] p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="supplier-modal-title" onMouseDown={e => e.stopPropagation()}><div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-[.16em] text-neutral-600">Supplier profile</p><h2 id="supplier-modal-title" className="mt-2 text-2xl font-semibold text-neutral-100">{supplier.name}</h2><p className="mt-1 text-sm text-neutral-500">{supplier.source} supplier · {supplier.status}</p></div><button onClick={onClose} className="text-neutral-500 hover:text-white text-xl" aria-label="Close supplier details">×</button></div><div className="mt-6 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Email</p><p className="mt-1 text-sm text-neutral-200 break-all">{supplier.email ?? 'N/A'}</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Website</p>{supplier.website ? <a href={supplier.website} target="_blank" rel="noreferrer" className="mt-1 block text-sm text-neutral-300 hover:text-white break-all">{supplier.website}</a> : <p className="mt-1 text-sm text-neutral-500">N/A</p>}</div></div><section className="mt-5"><h3 className="text-sm font-semibold">Categories</h3><div className="mt-2 flex flex-wrap gap-2">{supplier.categories.map(category => <span key={category} className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-xs text-neutral-300">{category}</span>)}</div></section>{intelligence && <section className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Quote coverage</p><p className="mt-1 text-lg font-semibold">{intelligence.coveragePercent}%</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Latest version</p><p className="mt-1 text-lg font-semibold">v{intelligence.quoteVersion}</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Missing items</p><p className="mt-1 text-lg font-semibold">{intelligence.missingLineItemIds.length}</p></div></section>}<section className="mt-5"><h3 className="text-sm font-semibold">Published prices</h3>{supplier.listPrices?.length ? <div className="mt-2 divide-y divide-white/[.05] rounded-xl border border-white/10">{supplier.listPrices.map((price, index) => <div key={`${price.itemHint}-${index}`} className="flex items-center justify-between gap-4 px-4 py-3 text-sm"><span className="text-neutral-300">{price.itemHint}</span><span className="text-neutral-500">{price.price.toLocaleString()} / {price.unit}</span></div>)}</div> : <p className="mt-2 text-sm text-neutral-600">No published prices were captured.</p>}</section><div className="mt-6 flex justify-end"><button onClick={onClose} className="bidwire-button bidwire-button-secondary">Close</button></div></div></div>
+  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="presentation" onMouseDown={onClose}>
+    <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0e0c] p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="supplier-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-xs uppercase tracking-[.16em] text-neutral-600">Supplier profile</p><h2 id="supplier-modal-title" className="mt-2 text-2xl font-semibold text-neutral-100">{supplier.name}</h2><p className="mt-1 text-sm text-neutral-500">{supplier.source} supplier · {supplier.status}</p></div>
+        <button onClick={onClose} className="text-neutral-500 hover:text-white text-xl" aria-label="Close supplier details">×</button>
+      </div>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Email</p><p className="mt-1 text-sm text-neutral-200 break-all">{supplier.email ?? 'N/A'}</p></div>
+        <div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Website</p>{supplier.website ? <a href={supplier.website} target="_blank" rel="noreferrer" className="mt-1 block text-sm text-neutral-300 hover:text-white break-all">{supplier.website}</a> : <p className="mt-1 text-sm text-neutral-500">N/A</p>}</div>
+      </div>
+      <section className="mt-5"><h3 className="text-sm font-semibold">Categories</h3><div className="mt-2 flex flex-wrap gap-2">{supplier.categories.map((category) => <span key={category} className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-xs text-neutral-300">{category}</span>)}</div></section>
+      {intelligence && <section className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Quote coverage</p><p className="mt-1 text-lg font-semibold">{intelligence.coveragePercent}%</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Latest version</p><p className="mt-1 text-lg font-semibold">v{intelligence.quoteVersion}</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-xs text-neutral-600">Missing items</p><p className="mt-1 text-lg font-semibold">{intelligence.missingLineItemIds.length}</p></div></section>}
+      <section className="mt-5"><h3 className="text-sm font-semibold">Published prices</h3>{supplier.listPrices?.length ? <div className="mt-2 divide-y divide-white/[.05] rounded-xl border border-white/10">{supplier.listPrices.map((price, index) => <div key={`${price.itemHint}-${index}`} className="flex items-center justify-between gap-4 px-4 py-3 text-sm"><span className="text-neutral-300">{price.itemHint}</span><span className="text-neutral-500">{price.price.toLocaleString()} / {price.unit}</span></div>)}</div> : <p className="mt-2 text-sm text-neutral-600">No published prices were captured.</p>}</section>
+      <div className="mt-6 flex justify-end"><button onClick={onClose} className="bidwire-button bidwire-button-secondary">Close</button></div>
+    </div>
+  </div>
 }
