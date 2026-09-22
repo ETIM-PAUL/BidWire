@@ -27,9 +27,6 @@ export const listLineItems = query({
   },
 });
 
-// Internal: only called by quoteExtraction.ts's processInboundMessage, which
-// runs with no user identity (triggered by the AgentMail webhook), so the
-// ownership-checked public query above isn't usable there.
 export const listLineItemsInternal = internalQuery({
   args: { projectId: v.id("projects") },
   returns: v.array(v.object(lineItemFields)),
@@ -47,6 +44,10 @@ export const createLineItem = mutation({
   returns: v.id("lineItems"),
   handler: async (ctx, args) => {
     await requireProjectOwner(ctx, args.projectId);
+    const project = await ctx.db.get(args.projectId);
+    if (project?.status === "awarded") {
+      throw new Error("Materials are locked after award.");
+    }
     const existing = await ctx.db
       .query("lineItems")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -75,7 +76,11 @@ export const updateLineItem = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireLineItemOwner(ctx, args.lineItemId);
+    const item = await requireLineItemOwner(ctx, args.lineItemId);
+    const project = await ctx.db.get(item.projectId);
+    if (project?.status === "awarded") {
+      throw new Error("Materials are locked after award.");
+    }
     const patch: Partial<{
       name: string;
       spec: string;
@@ -97,7 +102,11 @@ export const deleteLineItem = mutation({
   args: { lineItemId: v.id("lineItems") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireLineItemOwner(ctx, args.lineItemId);
+    const item = await requireLineItemOwner(ctx, args.lineItemId);
+    const project = await ctx.db.get(item.projectId);
+    if (project?.status === "awarded") {
+      throw new Error("Materials are locked after award.");
+    }
     await ctx.db.delete(args.lineItemId);
     return null;
   },
@@ -111,6 +120,10 @@ export const moveLineItem = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await requireLineItemOwner(ctx, args.lineItemId);
+    const project = await ctx.db.get(item.projectId);
+    if (project?.status === "awarded") {
+      throw new Error("Materials are locked after award.");
+    }
     const siblings = await ctx.db
       .query("lineItems")
       .withIndex("by_project", (q) => q.eq("projectId", item.projectId))
@@ -128,8 +141,6 @@ export const moveLineItem = mutation({
   },
 });
 
-// Internal: only called by boq.ts's generateBoq action, which has already
-// verified ownership via projects.getProject before calling these.
 export const insertBatch = internalMutation({
   args: {
     projectId: v.id("projects"),

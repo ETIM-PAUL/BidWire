@@ -13,6 +13,7 @@ export function MaterialsTab({ project }: { project: Doc<'projects'> }) {
   const moveLineItem = useMutation(api.lineItems.moveLineItem)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const awarded = project.status === 'awarded'
 
   async function handleGenerate() {
     setError(null)
@@ -35,13 +36,7 @@ export function MaterialsTab({ project }: { project: Doc<'projects'> }) {
           <div className="mt-3 flex flex-wrap gap-2">
             {attachments.map((a) =>
               a.url ? (
-                <a
-                  key={a.storageId}
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-neutral-400 underline hover:text-neutral-200"
-                >
+                <a key={a.storageId} href={a.url} target="_blank" rel="noreferrer" className="text-xs text-neutral-400 underline hover:text-neutral-200">
                   attachment
                 </a>
               ) : null,
@@ -50,18 +45,18 @@ export function MaterialsTab({ project }: { project: Doc<'projects'> }) {
         )}
       </div>
 
+      {awarded && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[.04] px-4 py-3 text-sm text-emerald-300">
+          Materials are locked because this project has been awarded. The awarded scope is preserved for auditability.
+        </div>
+      )}
+
       {lineItems === undefined ? (
         <p className="text-sm text-neutral-500">Loading…</p>
       ) : lineItems.length === 0 ? (
         <div className="rounded-lg border border-neutral-800 p-6 text-center space-y-3">
-          <p className="text-sm text-neutral-400">
-            No materials list yet. Generate one from the job description.
-          </p>
-          <button
-            onClick={() => void handleGenerate()}
-            disabled={generating}
-            className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
+          <p className="text-sm text-neutral-400">No materials list yet. Generate one from the job description.</p>
+          <button onClick={() => void handleGenerate()} disabled={generating || awarded} className="rounded-md bg-neutral-100 text-neutral-900 px-3 py-1.5 text-sm font-medium disabled:opacity-50">
             {generating ? 'Generating…' : 'Generate materials list'}
           </button>
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -69,97 +64,24 @@ export function MaterialsTab({ project }: { project: Doc<'projects'> }) {
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-neutral-300">
-              Materials ({lineItems.length})
-            </h3>
-            <button
-              onClick={() => void createLineItem({ projectId: project._id })}
-              className="text-sm text-neutral-400 hover:text-neutral-200"
-            >
+            <h3 className="text-sm font-medium text-neutral-300">Materials ({lineItems.length})</h3>
+            <button onClick={() => void createLineItem({ projectId: project._id })} disabled={awarded} className="text-sm text-neutral-400 hover:text-neutral-200 disabled:opacity-40 disabled:cursor-not-allowed">
               + Add item
             </button>
           </div>
           <div className="overflow-x-auto rounded-lg border border-neutral-800">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-800 text-left text-neutral-500">
-                  <th className="px-3 py-2 font-normal w-8"></th>
-                  <th className="px-3 py-2 font-normal">Name</th>
-                  <th className="px-3 py-2 font-normal">Spec</th>
-                  <th className="px-3 py-2 font-normal w-24">Qty</th>
-                  <th className="px-3 py-2 font-normal w-24">Unit</th>
-                  <th className="px-3 py-2 font-normal">Category</th>
-                  <th className="px-3 py-2 font-normal w-10"></th>
-                </tr>
-              </thead>
+              <thead><tr className="border-b border-neutral-800 text-left text-neutral-500"><th className="px-3 py-2 font-normal w-8"></th><th className="px-3 py-2 font-normal">Name</th><th className="px-3 py-2 font-normal">Spec</th><th className="px-3 py-2 font-normal w-24">Qty</th><th className="px-3 py-2 font-normal w-24">Unit</th><th className="px-3 py-2 font-normal">Category</th><th className="px-3 py-2 font-normal w-10"></th></tr></thead>
               <tbody>
                 {lineItems.map((item, i) => (
                   <tr key={item._id} className="border-b border-neutral-900 last:border-0">
-                    <td className="px-3 py-1.5">
-                      <div className="flex flex-col">
-                        <button
-                          disabled={i === 0}
-                          onClick={() =>
-                            void moveLineItem({ lineItemId: item._id, direction: 'up' })
-                          }
-                          className="text-neutral-600 hover:text-neutral-300 disabled:opacity-20 leading-none"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          disabled={i === lineItems.length - 1}
-                          onClick={() =>
-                            void moveLineItem({ lineItemId: item._id, direction: 'down' })
-                          }
-                          className="text-neutral-600 hover:text-neutral-300 disabled:opacity-20 leading-none"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <EditableCell
-                        value={item.name}
-                        onCommit={(v) => void updateLineItem({ lineItemId: item._id, name: v })}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <EditableCell
-                        value={item.spec}
-                        onCommit={(v) => void updateLineItem({ lineItemId: item._id, spec: v })}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <EditableCell
-                        value={String(item.quantity)}
-                        type="number"
-                        onCommit={(v) =>
-                          void updateLineItem({ lineItemId: item._id, quantity: Number(v) || 0 })
-                        }
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <EditableCell
-                        value={item.unit}
-                        onCommit={(v) => void updateLineItem({ lineItemId: item._id, unit: v })}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <EditableCell
-                        value={item.category}
-                        onCommit={(v) =>
-                          void updateLineItem({ lineItemId: item._id, category: v })
-                        }
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <button
-                        onClick={() => void deleteLineItem({ lineItemId: item._id })}
-                        className="text-neutral-600 hover:text-red-400"
-                      >
-                        ✕
-                      </button>
-                    </td>
+                    <td className="px-3 py-1.5"><div className="flex flex-col"><button disabled={awarded || i === 0} onClick={() => void moveLineItem({ lineItemId: item._id, direction: 'up' })} className="text-neutral-600 hover:text-neutral-300 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▲</button><button disabled={awarded || i === lineItems.length - 1} onClick={() => void moveLineItem({ lineItemId: item._id, direction: 'down' })} className="text-neutral-600 hover:text-neutral-300 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▼</button></div></td>
+                    <td className="px-3 py-1.5"><EditableCell value={item.name} disabled={awarded} onCommit={(v) => void updateLineItem({ lineItemId: item._id, name: v })} /></td>
+                    <td className="px-3 py-1.5"><EditableCell value={item.spec} disabled={awarded} onCommit={(v) => void updateLineItem({ lineItemId: item._id, spec: v })} /></td>
+                    <td className="px-3 py-1.5"><EditableCell value={String(item.quantity)} disabled={awarded} type="number" onCommit={(v) => void updateLineItem({ lineItemId: item._id, quantity: Number(v) || 0 })} /></td>
+                    <td className="px-3 py-1.5"><EditableCell value={item.unit} disabled={awarded} onCommit={(v) => void updateLineItem({ lineItemId: item._id, unit: v })} /></td>
+                    <td className="px-3 py-1.5"><EditableCell value={item.category} disabled={awarded} onCommit={(v) => void updateLineItem({ lineItemId: item._id, category: v })} /></td>
+                    <td className="px-3 py-1.5"><button disabled={awarded} onClick={() => void deleteLineItem({ lineItemId: item._id })} title={awarded ? 'Materials cannot be removed after award' : 'Remove material'} className="text-neutral-600 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed">✕</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -171,32 +93,8 @@ export function MaterialsTab({ project }: { project: Doc<'projects'> }) {
   )
 }
 
-function EditableCell({
-  value,
-  onCommit,
-  type = 'text',
-}: {
-  value: string
-  onCommit: (value: string) => void
-  type?: 'text' | 'number'
-}) {
+function EditableCell({ value, onCommit, type = 'text', disabled = false }: { value: string; onCommit: (value: string) => void; type?: 'text' | 'number'; disabled?: boolean }) {
   const [draft, setDraft] = useState(value)
-
-  useEffect(() => {
-    setDraft(value)
-  }, [value])
-
-  return (
-    <input
-      type={type}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft !== value) {
-          onCommit(draft)
-        }
-      }}
-      className="w-full bg-transparent text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-600 rounded px-1 py-0.5"
-    />
-  )
+  useEffect(() => { setDraft(value) }, [value])
+  return <input type={type} value={draft} disabled={disabled} onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (!disabled && draft !== value) onCommit(draft) }} className="w-full bg-transparent text-neutral-200 focus:outline-none focus:ring-1 focus:ring-neutral-600 rounded px-1 py-0.5 disabled:cursor-not-allowed disabled:text-neutral-500" />
 }
