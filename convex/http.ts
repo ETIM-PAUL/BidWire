@@ -1,5 +1,6 @@
 import { AgentMail } from "@agentmail/convex";
 import { httpRouter } from "convex/server";
+import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { components, internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
@@ -23,5 +24,10 @@ http.route({
     agentmail.handleWebhook(ctx as unknown as Parameters<typeof agentmail.handleWebhook>[0], req),
   ),
 });
+
+// Keep exact application routes above the static catch-all. This preserves
+// the existing AgentMail webhook and Convex Auth routes while serving the
+// Vite SPA from the root of the *.convex.site deployment.
+registerStaticRoutes(http, components.staticHosting);
 
 export default http;
