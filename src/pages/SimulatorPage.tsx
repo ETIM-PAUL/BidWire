@@ -7,7 +7,7 @@ import type { Id } from '../../convex/_generated/dataModel'
 const scenarios=[['prose_quote','Prose quote'],['pdf_quote','PDF quote'],['decline','Decline'],['revised_price','Revised price']] as const
 
 export function SimulatorPage(){
-  const admin=useQuery(api.suppliers.isDemoAdmin)
+  const admin=useQuery(api.suppliers.isDemoAdminQuery)
   const projects=useQuery(api.projects.listMyProjects)
   const [projectId,setProjectId]=useState<Id<'projects'>|''>('')
   const suppliers=useQuery(api.suppliers.listDemoSuppliers,projectId?{projectId}: 'skip')
