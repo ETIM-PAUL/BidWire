@@ -1,5 +1,5 @@
 import { useAction, useMutation, useQuery } from 'convex/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
 import { FollowUpDrafts } from './FollowUpDrafts'
@@ -15,12 +15,31 @@ const SOURCE_BADGE: Record<Doc<'suppliers'>['source'], string> = {
 }
 
 type WebsiteAction = 'research' | 'map' | 'crawl' | 'refresh'
+type WebsiteToast = { kind: 'success' | 'error'; message: string }
 
 const WEBSITE_ACTION_LABELS: Record<WebsiteAction, string> = {
   research: 'Research Supplier',
   map: 'Map Site',
   crawl: 'Crawl Site',
   refresh: 'Refresh Supplier',
+}
+
+function Spinner() {
+  return <span aria-hidden="true" className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+}
+
+function WebsiteToast({ toast, onClose }: { toast: WebsiteToast; onClose: () => void }) {
+  return (
+    <div className="fixed right-4 top-4 z-[120] w-[min(380px,calc(100vw-2rem))]" role="status" aria-live="polite">
+      <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-xl ${toast.kind === 'success' ? 'border-emerald-900/70 bg-[#071511]/95 text-emerald-200' : 'border-red-900/70 bg-[#17090a]/95 text-red-200'}`}>
+        <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${toast.kind === 'success' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300'}`}>
+          {toast.kind === 'success' ? '✓' : '!'}
+        </span>
+        <p className="flex-1 text-sm leading-5">{toast.message}</p>
+        <button type="button" onClick={onClose} className="text-lg leading-none text-neutral-500 hover:text-white" aria-label="Dismiss notification">×</button>
+      </div>
+    </div>
+  )
 }
 
 export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
@@ -38,10 +57,15 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
   const [discovering, setDiscovering] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [websiteBusy, setWebsiteBusy] = useState<{ supplierId: Id<'suppliers'>; action: WebsiteAction } | null>(null)
-  const [websiteError, setWebsiteError] = useState<string | null>(null)
-  const [websiteSuccess, setWebsiteSuccess] = useState<string | null>(null)
+  const [websiteToast, setWebsiteToast] = useState<WebsiteToast | null>(null)
   const [openNegotiationDraftId, setOpenNegotiationDraftId] = useState<Id<'drafts'> | null>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<Doc<'suppliers'> | null>(null)
+
+  useEffect(() => {
+    if (!websiteToast) return
+    const timeout = window.setTimeout(() => setWebsiteToast(null), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [websiteToast])
 
   async function handleDiscover() {
     setError(null)
@@ -58,8 +82,7 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
   async function handleWebsiteAction(supplier: Doc<'suppliers'>, actionName: WebsiteAction) {
     if (!supplier.website || websiteBusy) return
 
-    setWebsiteError(null)
-    setWebsiteSuccess(null)
+    setWebsiteToast(null)
     setWebsiteBusy({ supplierId: supplier._id, action: actionName })
 
     try {
@@ -72,9 +95,9 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
       } else {
         await refreshSupplierWebsite({ supplierId: supplier._id })
       }
-      setWebsiteSuccess(`${WEBSITE_ACTION_LABELS[actionName]} completed for ${supplier.name}.`)
+      setWebsiteToast({ kind: 'success', message: `${WEBSITE_ACTION_LABELS[actionName]} completed for ${supplier.name}.` })
     } catch (error) {
-      setWebsiteError(error instanceof Error ? error.message : `Could not ${WEBSITE_ACTION_LABELS[actionName].toLowerCase()}.`)
+      setWebsiteToast({ kind: 'error', message: error instanceof Error ? error.message : `Could not ${WEBSITE_ACTION_LABELS[actionName].toLowerCase()}.` })
     } finally {
       setWebsiteBusy(null)
     }
@@ -84,6 +107,8 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
 
   return (
     <div className="space-y-4">
+      {websiteToast && <WebsiteToast toast={websiteToast} onClose={() => setWebsiteToast(null)} />}
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-neutral-300">Suppliers {suppliers ? `(${suppliers.length})` : ''}</h3>
@@ -186,10 +211,12 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
                           key={actionName}
                           type="button"
                           disabled={disabled}
+                          aria-busy={active}
                           onClick={() => void handleWebsiteAction(s, actionName)}
                           title={!s.website ? 'Supplier has no website' : WEBSITE_ACTION_LABELS[actionName]}
-                          className="rounded-md border border-neutral-800 px-2 py-1.5 text-[11px] text-neutral-300 hover:border-neutral-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer disabled:hover:border-neutral-800"
+                          className="flex items-center justify-center gap-2 rounded-md border border-neutral-800 px-2 py-1.5 text-[11px] text-neutral-300 hover:border-neutral-600 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer disabled:hover:border-neutral-800"
                         >
+                          {active && <Spinner />}
                           {active ? `${WEBSITE_ACTION_LABELS[actionName]}…` : WEBSITE_ACTION_LABELS[actionName]}
                         </button>
                       )
@@ -225,9 +252,6 @@ export function SuppliersTab({ project }: { project: Doc<'projects'> }) {
           })}
         </div>
       )}
-
-      {websiteError && <p className="rounded-md border border-red-900/50 bg-red-950/20 px-3 py-2 text-xs text-red-300">{websiteError}</p>}
-      {websiteSuccess && <p className="rounded-md border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-300">{websiteSuccess}</p>}
 
       <SupplierIntelligence project={project} />
       <RfqDrafts project={project} />
