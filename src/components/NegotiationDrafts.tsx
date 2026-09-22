@@ -2,134 +2,19 @@ import { useAction, useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Doc, Id } from '../../convex/_generated/dataModel'
+import { useToast } from './ui'
 
 export function NegotiationDrafts({ project }: { project: Doc<'projects'> }) {
-  const suppliers = useQuery(api.suppliers.listSuppliers, { projectId: project._id })
-  const drafts = useQuery(api.drafts.listDrafts, { projectId: project._id })
-  const negotiate = useAction(api.negotiateDraft.negotiateWithSupplier)
-  const sendNegotiation = useMutation(api.negotiate.sendNegotiationDraft)
-  const updateDraft = useMutation(api.drafts.updateDraft)
-  const discardDraft = useMutation(api.drafts.discardDraft)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-
+  const suppliers = useQuery(api.suppliers.listSuppliers, { projectId: project._id }); const drafts = useQuery(api.drafts.listDrafts, { projectId: project._id }); const sendNegotiation = useMutation(api.negotiate.sendNegotiationDraft); const updateDraft = useMutation(api.drafts.updateDraft); const discardDraft = useMutation(api.drafts.discardDraft); const { toast } = useToast()
   const pending = drafts?.filter((d) => d.kind === 'counter' && d.status === 'pending') ?? []
-  const supplierName = (id: Id<'suppliers'>) =>
-    suppliers?.find((s) => s._id === id)?.name ?? 'Supplier'
-
-  async function handleSend(draftId: Id<'drafts'>) {
-    setErrors((prev) => ({ ...prev, [draftId]: '' }))
-    try {
-      const result = await sendNegotiation({ draftId })
-      if (!result.ok) {
-        setErrors((prev) => ({
-          ...prev,
-          [draftId]: result.blockedReason ?? 'Send was blocked.',
-        }))
-      }
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        [draftId]: err instanceof Error ? err.message : 'Could not send negotiation.',
-      }))
-    }
-  }
-
+  const supplierName = (id: Id<'suppliers'>) => suppliers?.find((s) => s._id === id)?.name ?? 'Supplier'
+  async function handleSend(draftId: Id<'drafts'>) { try { const result = await sendNegotiation({ draftId }); if (!result.ok) toast('error', 'Negotiation blocked', result.blockedReason ?? 'The draft could not be approved.'); else toast('success', 'Negotiation sent', 'The supplier will receive the approved counter-offer in the existing thread.') } catch (err) { toast('error', 'Could not send negotiation', err instanceof Error ? err.message : 'Please try again.') } }
   if (pending.length === 0) return null
-
-  return (
-    <div className="space-y-3 border-t border-neutral-900 pt-4">
-      <div>
-        <h3 className="text-sm font-medium text-neutral-300">Negotiation drafts ({pending.length})</h3>
-        <p className="text-xs text-neutral-500 mt-1">
-          Review and edit the counter-offer before approving it. Any price in the final message must
-          exist in a stored quote.
-        </p>
-      </div>
-      {pending.map((draft) => (
-        <div key={draft._id} className="rounded-lg border border-neutral-800 p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{supplierName(draft.supplierId)}</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => void handleSend(draft._id)}
-                className="text-xs rounded-md bg-neutral-100 text-neutral-900 px-2 py-1 font-medium"
-              >
-                Approve &amp; send
-              </button>
-              <button
-                onClick={() => void discardDraft({ draftId: draft._id })}
-                className="text-xs text-neutral-500 hover:text-red-400"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-          <input
-            defaultValue={draft.subject}
-            onBlur={(e) => {
-              if (e.currentTarget.value !== draft.subject) {
-                void updateDraft({ draftId: draft._id, subject: e.currentTarget.value })
-              }
-            }}
-            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-sm"
-          />
-          <textarea
-            defaultValue={draft.body}
-            rows={6}
-            onBlur={(e) => {
-              if (e.currentTarget.value !== draft.body) {
-                void updateDraft({ draftId: draft._id, body: e.currentTarget.value })
-              }
-            }}
-            className="w-full bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-sm"
-          />
-          {errors[draft._id] && <p className="text-xs text-red-400">{errors[draft._id]}</p>}
-        </div>
-      ))}
-    </div>
-  )
+  return <div className="space-y-3 border-t border-white/10 pt-5"><div><h3 className="text-sm font-semibold text-neutral-200">Negotiation drafts <span className="text-neutral-600">{pending.length}</span></h3><p className="mt-1 text-xs text-neutral-500">Review and edit before approval. Prices are validated against stored quotes.</p></div>{pending.map((draft) => <div key={draft._id} className="rounded-2xl border border-white/10 bg-white/[.02] p-4 space-y-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">{supplierName(draft.supplierId)}</p><p className="mt-0.5 text-xs text-neutral-600">Pending human approval</p></div><div className="flex gap-2"><button onClick={() => void handleSend(draft._id)} className="bidwire-button bidwire-button-primary text-xs">Approve &amp; send</button><button onClick={() => void discardDraft({ draftId: draft._id })} className="bidwire-button bidwire-button-secondary text-xs">Discard</button></div></div><input defaultValue={draft.subject} onBlur={(e) => { if (e.currentTarget.value !== draft.subject) void updateDraft({ draftId: draft._id, subject: e.currentTarget.value }) }} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm" /><textarea defaultValue={draft.body} rows={6} onBlur={(e) => { if (e.currentTarget.value !== draft.body) void updateDraft({ draftId: draft._id, body: e.currentTarget.value }) }} className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm leading-6" /></div>)}</div>
 }
 
-export function NegotiateButton({
-  projectId,
-  supplierId,
-  lineItemId,
-}: {
-  projectId: Id<'projects'>
-  supplierId: Id<'suppliers'>
-  lineItemId?: Id<'lineItems'>
-}) {
-  const negotiate = useAction(api.negotiateDraft.negotiateWithSupplier)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleClick() {
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await negotiate({
-        projectId,
-        supplierId,
-        lineItemIds: lineItemId ? [lineItemId] : undefined,
-      })
-      if (!result.ok) setError(result.reason)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not generate negotiation draft.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <span className="inline-flex flex-col items-end gap-1">
-      <button
-        onClick={() => void handleClick()}
-        disabled={busy}
-        className="text-[11px] rounded border border-neutral-700 px-2 py-1 text-neutral-300 hover:text-neutral-100 disabled:opacity-50"
-      >
-        {busy ? 'Drafting…' : 'Negotiate'}
-      </button>
-      {error && <span className="max-w-[180px] text-[10px] text-red-400 text-right">{error}</span>}
-    </span>
-  )
+export function NegotiateButton({ projectId, supplierId, lineItemId }: { projectId: Id<'projects'>; supplierId: Id<'suppliers'>; lineItemId?: Id<'lineItems'> }) {
+  const negotiate = useAction(api.negotiateDraft.negotiateWithSupplier); const { toast } = useToast(); const [busy, setBusy] = useState(false)
+  async function handleClick() { setBusy(true); try { const result = await negotiate({ projectId, supplierId, lineItemIds: lineItemId ? [lineItemId] : undefined }); if (!result.ok) toast('info', 'Not negotiable', result.reason); else toast('success', 'Draft ready', 'Review the counter-offer below before approving it.') } catch (err) { toast('error', 'Could not create draft', err instanceof Error ? err.message : 'Please try again.') } finally { setBusy(false) } }
+  return <button onClick={() => void handleClick()} disabled={busy} className="rounded-lg border border-white/10 bg-white/[.025] px-2.5 py-1.5 text-[11px] font-semibold text-neutral-300 transition hover:border-white/20 hover:bg-white/[.06] hover:text-white disabled:opacity-50">{busy ? 'Drafting…' : 'Negotiate'}</button>
 }
