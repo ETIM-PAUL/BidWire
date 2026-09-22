@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { api, components } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import { requireProjectOwner } from "./lib/auth";
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 
@@ -28,12 +28,20 @@ function demoPdfBase64(text: string): string {
 }
 
 const listPriceFields = { itemHint: v.string(), price: v.number(), unit: v.string() };
+const researchSourceFields = { url: v.string(), title: v.optional(v.string()), reason: v.optional(v.string()) };
+const webChangeFields = { detectedAt: v.number(), summary: v.string(), url: v.string() };
+
 const supplierFields = {
   _id: v.id("suppliers"), _creationTime: v.number(), projectId: v.id("projects"), name: v.string(),
-  website: v.optional(v.string()), email: v.optional(v.string()),
+  website: v.optional(v.string()), email: v.optional(v.string()), phone: v.optional(v.string()),
   source: v.union(v.literal("firecrawl"), v.literal("manual"), v.literal("demo")), categories: v.array(v.string()),
   listPrices: v.optional(v.array(v.object(listPriceFields))),
   status: v.union(v.literal("candidate"), v.literal("selected"), v.literal("rfq_sent"), v.literal("replied"), v.literal("declined"), v.literal("silent")),
+  researchStatus: v.optional(v.union(v.literal("idle"), v.literal("researching"), v.literal("verified"), v.literal("needs_review"), v.literal("failed"))),
+  researchedAt: v.optional(v.number()), researchLocation: v.optional(v.string()), researchLocationVerified: v.optional(v.boolean()), researchCategories: v.optional(v.array(v.string())),
+  researchReasons: v.optional(v.array(v.string())), researchEvidence: v.optional(v.array(v.string())), researchSources: v.optional(v.array(v.object(researchSourceFields))), researchSourceCount: v.optional(v.number()),
+  researchUrls: v.optional(v.array(v.string())), mapUrls: v.optional(v.array(v.string())), crawlId: v.optional(v.string()), lastCrawlAt: v.optional(v.number()),
+  monitoringEnabled: v.optional(v.boolean()), lastMonitoredAt: v.optional(v.number()), lastWebChangeAt: v.optional(v.number()), lastWebChangeSummary: v.optional(v.string()), webChangeHistory: v.optional(v.array(v.object(webChangeFields))),
 };
 
 export const listSuppliers = query({
@@ -41,7 +49,7 @@ export const listSuppliers = query({
   handler: async (ctx, args) => { await requireProjectOwner(ctx, args.projectId); return ctx.db.query("suppliers").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500); },
 });
 
-// Public helper used by supplier intelligence actions to resolve and authorize a supplier's project.
+// Public because client actions use it to resolve and authorize a supplier's project.
 export const getSupplierProjectId = query({
   args: { supplierId: v.id("suppliers") }, returns: v.union(v.object({ projectId: v.id("projects") }), v.null()),
   handler: async (ctx, args) => { const supplier = await ctx.db.get(args.supplierId); if (!supplier) return null; await requireProjectOwner(ctx, supplier.projectId); return { projectId: supplier.projectId }; },
@@ -72,7 +80,7 @@ export const insertDiscoveredSupplier = internalMutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("suppliers").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500);
     if (existing.some(s => s.website && extractDomain(s.website) === args.domain)) return null;
-    await ctx.db.insert("suppliers", { projectId: args.projectId, name: args.name, website: args.website, email: args.email, source: "firecrawl", categories: args.categories, listPrices: args.listPrices.length > 0 ? args.listPrices : undefined, status: "selected" });
+    await ctx.db.insert("suppliers", { projectId: args.projectId, name: args.name, website: args.website, email: args.email, source: "firecrawl", categories: args.categories, listPrices: args.listPrices.length > 0 ? args.listPrices : undefined, status: "selected", researchStatus: "idle" });
     return null;
   },
 });
@@ -88,25 +96,116 @@ async function getOwnedSupplier(ctx: any, supplierId: any) {
   return supplier;
 }
 
-async function firecrawlRequest(url: string, operation: "research" | "map" | "crawl") {
-  const client = new FirecrawlClient(components.firecrawl);
-  if (operation === "research") {
-    const page = await client.scrape(url, { formats: ["markdown"] });
-    return { operation, url, title: page.metadata?.title ?? null, description: page.metadata?.description ?? null, markdown: (page.markdown ?? "").slice(0, 30000), links: Array.isArray(page.links) ? page.links.slice(0, 100) : [] };
+const supplierResearchSchema = {
+  type: "object", properties: {
+    businessName: { type: "string" }, website: { type: ["string", "null"] }, email: { type: ["string", "null"] }, phone: { type: ["string", "null"] }, location: { type: ["string", "null"] },
+    locationVerified: { type: "boolean" }, categories: { type: "array", items: { type: "string" } }, reasons: { type: "array", items: { type: "string" } }, evidence: { type: "array", items: { type: "string" } },
+    sources: { type: "array", items: { type: "object", properties: { url: { type: "string" }, title: { type: "string" }, reason: { type: "string" } }, required: ["url"], additionalProperties: false } },
+    listPrices: { type: "array", items: { type: "object", properties: { itemHint: { type: "string" }, price: { type: "number" }, unit: { type: "string" } }, required: ["itemHint", "price", "unit"], additionalProperties: false } },
+    summary: { type: "string" },
+  }, required: ["businessName", "locationVerified", "categories", "reasons", "evidence", "sources", "listPrices", "summary"], additionalProperties: false,
+};
+
+async function firecrawlAgent(prompt: string, urls?: string[]) {
+  const key = process.env.FIRECRAWL_API_KEY; if (!key) throw new Error("FIRECRAWL_API_KEY is not configured.");
+  const base = (process.env.FIRECRAWL_API_URL ?? "https://api.firecrawl.dev/v2").replace(/\/$/, "");
+  const started = await fetch(`${base}/agent`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ prompt, urls, model: "spark-1-mini", maxCredits: 80, schema: supplierResearchSchema }) });
+  if (!started.ok) throw new Error(`Firecrawl Agent failed: ${(await started.text()).slice(0, 300)}`);
+  const initial = await started.json() as { id?: string; jobId?: string };
+  const jobId = initial.id ?? initial.jobId; if (!jobId) throw new Error("Firecrawl Agent did not return a job id.");
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const response = await fetch(`${base}/agent/${encodeURIComponent(jobId)}`, { headers: { Authorization: `Bearer ${key}` } });
+    if (!response.ok) throw new Error(`Firecrawl Agent status failed: ${(await response.text()).slice(0, 300)}`);
+    const status = await response.json() as any;
+    if (status.status === "completed") return status;
+    if (status.status === "failed" || status.status === "cancelled") throw new Error(`Firecrawl Agent ${status.status}.`);
   }
-  if (operation === "map") {
-    const result = await client.map(url, { limit: 100 });
-    return { operation, url, links: Array.isArray(result.links) ? result.links : [] };
-  }
-  const result = await client.crawl(url, { limit: 20, scrapeOptions: { formats: ["markdown"] } });
-  return { operation, url, status: result.status ?? "completed", total: result.total ?? result.data?.length ?? 0, completed: result.completed ?? result.data?.length ?? 0, pages: (result.data ?? []).slice(0, 20).map((page: any) => ({ url: page.metadata?.sourceURL ?? page.url ?? null, title: page.metadata?.title ?? null, markdown: (page.markdown ?? "").slice(0, 6000) })) };
+  throw new Error("Supplier research timed out. Try again.");
 }
 
-// These four public actions were missing from the deployed suppliers module. Keep the results ephemeral so website research does not silently become supplier facts.
-export const researchSupplier = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to research."); return firecrawlRequest(supplier.website, "research"); } });
-export const mapSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to map."); return firecrawlRequest(supplier.website, "map"); } });
-export const crawlSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to crawl."); return firecrawlRequest(supplier.website, "crawl"); } });
-export const refreshSupplierWebsite = action({ args: { supplierId: v.id("suppliers") }, returns: v.any(), handler: async (ctx, args) => { const supplier = await getOwnedSupplier(ctx, args.supplierId); const url = supplier.website; if (!url) throw new Error("Supplier has no website to refresh."); return { ...(await firecrawlRequest(url, "research")), refreshedAt: Date.now() }; } });
+export const setResearchStatus = internalMutation({ args: { supplierId: v.id("suppliers"), status: v.union(v.literal("idle"), v.literal("researching"), v.literal("verified"), v.literal("needs_review"), v.literal("failed")) }, returns: v.null(), handler: async (ctx, args) => { await ctx.db.patch(args.supplierId, { researchStatus: args.status }); return null; } });
+
+export const saveResearch = internalMutation({
+  args: { supplierId: v.id("suppliers"), businessName: v.string(), website: v.optional(v.string()), email: v.optional(v.string()), phone: v.optional(v.string()), location: v.optional(v.string()), locationVerified: v.boolean(), categories: v.array(v.string()), reasons: v.array(v.string()), evidence: v.array(v.string()), sources: v.array(v.object(researchSourceFields)), listPrices: v.array(v.object(listPriceFields)), summary: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const supplier = await ctx.db.get(args.supplierId); if (!supplier) return null;
+    const status = args.locationVerified && args.categories.length > 0 ? "verified" : "needs_review";
+    const mergedPrices = args.listPrices.length > 0 ? args.listPrices : supplier.listPrices;
+    const urls = Array.from(new Set([...(supplier.researchUrls ?? []), ...args.sources.map(s => s.url), ...(args.website ? [args.website] : [])])).slice(0, 30);
+    await ctx.db.patch(args.supplierId, {
+      name: args.businessName || supplier.name, website: args.website ?? supplier.website, email: args.email ?? supplier.email, phone: args.phone ?? supplier.phone,
+      researchStatus: status, researchedAt: Date.now(), researchLocation: args.location, researchLocationVerified: args.locationVerified, researchCategories: args.categories,
+      researchReasons: args.reasons, researchEvidence: [args.summary, ...args.evidence].slice(0, 12), researchSources: args.sources, researchSourceCount: args.sources.length, researchUrls: urls, listPrices: mergedPrices,
+    });
+    return null;
+  },
+});
+
+export const researchSupplier = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId);
+    const project = await ctx.runQuery(api.projects.getProject, { projectId: supplier.projectId });
+    const lineItems = await ctx.runQuery(api.lineItems.listLineItems, { projectId: supplier.projectId });
+    await ctx.runMutation(internal.suppliers.setResearchStatus, { supplierId: args.supplierId, status: "researching" });
+    try {
+      const requested = lineItems.map(x => `${x.name} — ${x.spec} (${x.quantity} ${x.unit}; ${x.category})`).join("; ");
+      const prompt = `Research this procurement supplier for BidWire. Project: ${project.name}. Required physical/service location: ${project.location}. Required items: ${requested}. Supplier candidate: ${supplier.name}. Candidate website: ${supplier.website ?? "unknown"}. Verify the actual business location, not merely a delivery/service area. Verify that the business actually sells or provides at least one requested category/item. Find an official website/contact route when possible. Capture only evidence found on public pages. Do not invent emails, phone numbers, prices, locations, certifications or products. If the location cannot be verified, set locationVerified false. Return concise reasons explaining why this supplier matches or needs review.`;
+      const result = await firecrawlAgent(prompt, supplier.website ? [supplier.website] : undefined);
+      const raw = result.data?.[0]?.data ?? result.data ?? {};
+      const data = (raw && typeof raw === "object" ? raw : {}) as any;
+      const sources = Array.isArray(data.sources) ? data.sources : (Array.isArray(result.sources) ? result.sources : []);
+      await ctx.runMutation(internal.suppliers.saveResearch, {
+        supplierId: args.supplierId, businessName: typeof data.businessName === "string" ? data.businessName : supplier.name, website: typeof data.website === "string" ? data.website : supplier.website,
+        email: typeof data.email === "string" ? data.email : undefined, phone: typeof data.phone === "string" ? data.phone : undefined, location: typeof data.location === "string" ? data.location : undefined,
+        locationVerified: data.locationVerified === true, categories: Array.isArray(data.categories) ? data.categories.filter((x: unknown): x is string => typeof x === "string") : [],
+        reasons: Array.isArray(data.reasons) ? data.reasons.filter((x: unknown): x is string => typeof x === "string").slice(0, 8) : [], evidence: Array.isArray(data.evidence) ? data.evidence.filter((x: unknown): x is string => typeof x === "string").slice(0, 10) : [],
+        sources: sources.filter((x: any) => x && typeof x.url === "string").slice(0, 20).map((x: any) => ({ url: x.url, title: typeof x.title === "string" ? x.title : undefined, reason: typeof x.reason === "string" ? x.reason : undefined })),
+        listPrices: Array.isArray(data.listPrices) ? data.listPrices.filter((x: any) => x && typeof x.itemHint === "string" && typeof x.price === "number" && typeof x.unit === "string").slice(0, 50) : [],
+        summary: typeof data.summary === "string" ? data.summary : "Research completed; review the evidence below.",
+      });
+    } catch (error) {
+      await ctx.runMutation(internal.suppliers.setResearchStatus, { supplierId: args.supplierId, status: "failed" });
+      throw error;
+    }
+    return null;
+  },
+});
+
+const firecrawl = new FirecrawlClient(components.firecrawl);
+
+export const mapSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to map.");
+    const result = await firecrawl.map(supplier.website, { limit: 100 });
+    const links = Array.isArray((result as any)?.links) ? (result as any).links.map((x: any) => typeof x === "string" ? x : x?.url).filter((x: unknown): x is string => typeof x === "string") : [];
+    await ctx.runMutation(internal.suppliers.saveMapUrls, { supplierId: args.supplierId, urls: links.slice(0, 100) });
+    return null;
+  },
+});
+
+export const saveMapUrls = internalMutation({ args: { supplierId: v.id("suppliers"), urls: v.array(v.string()) }, returns: v.null(), handler: async (ctx, args) => { await ctx.db.patch(args.supplierId, { mapUrls: args.urls, researchUrls: args.urls.slice(0, 30) }); return null; } });
+
+export const crawlSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const supplier = await getOwnedSupplier(ctx, args.supplierId); if (!supplier.website) throw new Error("Supplier has no website to crawl.");
+    const result = await firecrawl.crawl(supplier.website, { limit: 20, scrapeOptions: { formats: ["markdown"] } });
+    const pages = (result.data ?? []).slice(0, 20).map((page: any) => page.metadata?.sourceURL ?? page.url).filter((x: unknown): x is string => typeof x === "string");
+    await ctx.runMutation(internal.suppliers.saveCrawlResult, { supplierId: args.supplierId, crawlId: typeof (result as any).id === "string" ? (result as any).id : undefined, urls: pages });
+    return null;
+  },
+});
+
+export const saveCrawlResult = internalMutation({ args: { supplierId: v.id("suppliers"), crawlId: v.optional(v.string()), urls: v.array(v.string()) }, returns: v.null(), handler: async (ctx, args) => { await ctx.db.patch(args.supplierId, { crawlId: args.crawlId, lastCrawlAt: Date.now(), researchUrls: Array.from(new Set(args.urls)).slice(0, 30) }); return null; } });
+
+export const refreshSupplierWebsite = action({
+  args: { supplierId: v.id("suppliers") }, returns: v.null(),
+  handler: async (ctx, args) => { await ctx.runAction(api.suppliers.researchSupplier, { supplierId: args.supplierId }); return null; },
+});
 
 export const simulatorReplies = action({
   args: { projectId: v.id("projects"), supplierId: v.id("suppliers"), scenario: v.union(v.literal("prose_quote"), v.literal("pdf_quote"), v.literal("decline"), v.literal("revised_price")) }, returns: v.null(),
@@ -120,7 +219,7 @@ export const simulatorReplies = action({
     const lines = await ctx.runQuery(api.lineItems.listLineItems, { projectId: args.projectId }); const selected = lines.slice(0, Math.min(lines.length, 5)); const price = (i: number) => 10000 + i * 2500;
     const subjectPrefix = "[BidWire:" + project._id + "] "; let subject = subjectPrefix + "Quotation — " + project.name, text = "";
     if (args.scenario === "decline") { subject = subjectPrefix + "Unable to quote — " + project.name; text = "Thanks for the RFQ. Unfortunately we are unable to supply this order at this time. Please keep us in mind for a future project."; }
-    else { const revised = args.scenario === "revised_price"; text = "Dear Bidwire,\\n\\nPlease find our " + (revised ? "revised " : "") + "quotation:\\n\\n" + selected.map((x, i) => x.name + " — " + x.quantity + " " + x.unit + " @ " + price(i) * (revised ? 0.94 : 1) + " NGN").join("\\n") + "\\n\\nDelivery: 3 days\\nValid for 14 days.\\n\\nRegards,\\nDemo Supplier"; if (args.scenario === "pdf_quote") subject = subjectPrefix + "Quotation attached — " + project.name; }
+    else { const revised = args.scenario === "revised_price"; text = "Dear Bidwire,\n\nPlease find our " + (revised ? "revised " : "") + "quotation:\n\n" + selected.map((x, i) => x.name + " — " + x.quantity + " " + x.unit + " @ " + price(i) * (revised ? 0.94 : 1) + " NGN").join("\n") + "\n\nDelivery: 3 days\nValid for 14 days.\n\nRegards,\nDemo Supplier"; if (args.scenario === "pdf_quote") subject = subjectPrefix + "Quotation attached — " + project.name; }
     const response = await fetch(baseUrl + "/inboxes/" + encodeURIComponent(supplier.email) + "/messages", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ to: project.inboxAddress, subject, text, ...(args.scenario === "pdf_quote" ? { attachments: [{ content: demoPdfBase64("Demo supplier quotation"), filename: "quote.pdf", content_type: "application/pdf" }] } : {}) }) });
     if (!response.ok) throw new Error("AgentMail simulator send failed: " + (await response.text()).slice(0, 300)); return null;
   },
